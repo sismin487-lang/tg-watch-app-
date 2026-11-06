@@ -13,7 +13,7 @@
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-between p-4 selection:bg-sky-500 selection:text-white">
 
   <div class="w-full max-w-md flex flex-col gap-5 my-auto">
-    <div class="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-3xl p-5 shadow-2xl flex flex-col items-center gap-3">
+    <div class="bg-slate-900/85 backdrop-blur-md border border-slate-800 rounded-3xl p-5 shadow-2xl flex flex-col items-center gap-3">
       <div class="flex items-center gap-2">
         <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-sky-400 to-blue-600 flex items-center justify-center text-white shadow-md">
           <i class="fa-solid fa-play text-xs"></i>
@@ -129,8 +129,9 @@
         updateUI();
     });
 
+    // Adsgram Block ID ထည့်သွင်းပြီးပါပြီ (int-58231)
     const adController = window.Adsgram.init({ 
-        blockId: "YOUR_ADSGRAM_BLOCK_ID",
+        blockId: "int-58231",
         debug: false 
     });
 
@@ -143,7 +144,7 @@
             await adController.show();
             userPoints += 10;
             updateUI();
-            tg.showAlert(" ဂုဏ်ယူပါတယ်! ကြော်ငြာကြည့်ရှုပြီး 10 PTS ရရှိသွားပါပြီ။");
+            tg.showAlert("ဂုဏ်ယူပါတယ်! ကြော်ငြာကြည့်ရှုပြီး 10 PTS ရရှိသွားပါပြီ။");
             
             if(telegramUserId) {
                 fetch('/api/index', {
@@ -153,7 +154,7 @@
                 }).catch(err => console.log(err));
             }
         } catch (err) {
-            tg.showAlert(" ကြော်ငြာကြည့်ရှုခြင်း မပြီးဆုံးပါ သို့မဟုတ် အမှားအယွင်းရှိခဲ့ပါသည်။");
+            tg.showAlert("ကြော်ငြာကြည့်ရှုခြင်း မပြီးဆုံးပါ သို့မဟုတ် အမှားအယွင်းရှိခဲ့ပါသည်။");
         } finally {
             btn.disabled = false;
             btn.innerHTML = `<i class="fa-solid fa-circle-play text-lg"></i> <span>ဗီဒီယိုကြော်ငြာကြည့်မည် (Watch Ad)</span>`;
@@ -181,12 +182,12 @@
             };
 
             await tonConnectUI.sendTransaction(transaction);
-            tg.showAlert(" ငွေထုတ်ယူမှုတောင်းဆိုမှု အောင်မြင်ပါသည်။ Admin ဘက်မှ စစ်ဆေးပြီး ပို့ဆောင်ပေးပါမည်။");
+            tg.showAlert("ငွေထုတ်ယူမှုတောင်းဆိုမှု အောင်မြင်ပါသည်။ Admin ဘက်မှ စစ်ဆေးပြီး ပို့ဆောင်ပေးပါမည်။");
             
             userPoints = 0;
             updateUI();
         } catch (e) {
-            tg.showAlert(" ငွေထုတ်ယူခြင်း ပျက်ပြားသွားပါပြီ သို့မဟုတ် ငြင်းပယ်ခံရပါသည်။");
+            tg.showAlert("ငွေထုတ်ယူခြင်း ပျက်ပြားသွားပါပြီ သို့မဟုတ် ငြင်းပယ်ခံရပါသည်။");
         }
     }
 
