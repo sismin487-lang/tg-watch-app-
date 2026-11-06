@@ -121,7 +121,7 @@
     }
 
     const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-        manifestUrl: 'https://tg-watch-app.vercel.app/tonconnect-manifest.json',
+        manifestUrl: 'https://tg-watch-app-l61bjmsx2-sismin487-1940.vercel.app/tonconnect-manifest.json',
         buttonRootId: 'ton-connect'
     });
 
@@ -129,9 +129,9 @@
         updateUI();
     });
 
-    // Adsgram Block ID တွင် Reward အမျိုးအစားအတွက် "rew-" prefix ပါသော ID အမှန်ကို ထည့်ပါ (ဥပမာ: rew-xxxxxx)
+    // Adsgram Reward Block ID အမှန် (rew-58231)
     const adController = window.Adsgram.init({ 
-        blockId: "rew-xxxxxx", 
+        blockId: "rew-58231", 
         debug: false 
     });
 
