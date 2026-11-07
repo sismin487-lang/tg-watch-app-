@@ -161,8 +161,17 @@
         localStorage.setItem('user_points', userPoints);
     }
 
+    // Manifest Error လုံးဝကင်းစင်စေရန် Data URL အသုံးပြုထားခြင်း (မူရင်းဖိုင်ဖွဲ့စည်းပုံအပြည့်အစုံ)
+    const manifestJson = {
+        url: window.location.origin,
+        name: "Tg Watch Mini App",
+        iconUrl: "https://avatars.githubusercontent.com/u/0?v=4"
+    };
+    const manifestBase64 = btoa(JSON.stringify(manifestJson));
+    const manifestUrl = `data:application/json;base64,${manifestBase64}`;
+
     const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-        manifestUrl: 'https://tg-watch-app-l61bjmsx2-sismin487-1940.vercel.app/tonconnect-manifest.json',
+        manifestUrl: manifestUrl,
         buttonRootId: 'ton-connect'
     });
 
