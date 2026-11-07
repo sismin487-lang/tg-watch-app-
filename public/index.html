@@ -105,17 +105,21 @@
     tg.ready();
     tg.expand();
 
-    let userPoints = parseInt(localStorage.getItem('user_points')) || 0;
     const POINT_RATE = 0.0001; 
     const MIN_WITHDRAWAL = 30000;
     let telegramUserId = null;
+    let userPoints = 0;
+    let storageKey = 'user_points_guest';
 
-    // Bot Username အမှန်ကို Adsgram12_bot သို့ တိုက်ရိုက်သတ်မှတ်ပေးထားသည်
+    // Bot Username အမှန်ကို Adsgram12_bot သို့ ချိတ်ဆက်ပေးထားသည်
     const botUsername = "Adsgram12_bot"; 
 
     if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
         const user = tg.initDataUnsafe.user;
         telegramUserId = user.id;
+        storageKey = `user_points_${telegramUserId}`;
+        userPoints = parseInt(localStorage.getItem(storageKey)) || 0;
+
         document.getElementById('user-greeting').innerHTML = `<i class="fa-solid fa-user text-sky-400"></i> ${user.first_name} <span class="text-slate-500">(ID: ${user.id})</span>`;
         
         const refLink = `https://t.me/${botUsername}?start=ref_${telegramUserId}`;
@@ -127,8 +131,10 @@
             body: JSON.stringify({ action: 'login', userId: telegramUserId, username: user.username })
         }).catch(err => console.log(err));
     } else {
+        storageKey = 'user_points_preview';
+        userPoints = parseInt(localStorage.getItem(storageKey)) || 0;
         document.getElementById('user-greeting').innerHTML = `<i class="fa-solid fa-globe text-amber-400"></i> Web Browser Preview Mode`;
-        document.getElementById('ref-link-input').value = `https://t.me/${botUsername}?start=ref_7120292163`;
+        document.getElementById('ref-link-input').value = `https://t.me/${botUsername}?start=ref_52504489`;
     }
 
     function copyRefLink() {
@@ -159,7 +165,7 @@
             withdrawBtn.setAttribute('disabled', 'true');
             withdrawBtn.className = "w-full py-3.5 px-4 bg-slate-800 text-slate-500 font-bold rounded-2xl cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 border border-slate-800";
         }
-        localStorage.setItem('user_points', userPoints);
+        localStorage.setItem(storageKey, userPoints);
     }
 
     const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
