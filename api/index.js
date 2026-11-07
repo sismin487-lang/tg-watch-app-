@@ -1,238 +1,87 @@
-<!DOCTYPE html>
-<html lang="my">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Tg Watch & Earn</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
-  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-</head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-between p-4 selection:bg-sky-500 selection:text-white">
+const { Telegraf } = require('telegraf');
 
-  <div class="w-full max-w-md flex flex-col gap-5 my-auto">
-    <!-- User Greeting & TonConnect -->
-    <div class="bg-slate-900/85 backdrop-blur-md border border-slate-800 rounded-3xl p-5 shadow-2xl flex flex-col items-center gap-3">
-      <div class="flex items-center gap-2">
-        <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-sky-400 to-blue-600 flex items-center justify-center text-white shadow-md">
-          <i class="fa-solid fa-play text-xs"></i>
-        </div>
-        <h1 class="text-lg font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-blue-500 uppercase">Tg Watch</h1>
-      </div>
-      <div id="user-greeting" class="text-xs text-slate-400 font-medium bg-slate-950/50 px-3 py-1.5 rounded-full border border-slate-800/80 break-all text-center">
-        Loading Telegram profile...
-      </div>
-      <div id="ton-connect" class="mt-1 flex justify-center"></div>
-    </div>
+const bot = new Telegraf(process.env.BOT_TOKEN);
+const adminChatId = "52504489"; // Admin Telegram ID အမှန် (ပုံထဲပါသည့် ID)
 
-    <!-- Points & Balance -->
-    <div class="relative overflow-hidden bg-gradient-to-b from-slate-900 to-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center gap-2">
-      <span class="text-xs uppercase tracking-widest text-slate-400 font-bold flex items-center gap-1.5">
-        <i class="fa-solid fa-coins text-amber-400"></i> သင့်လက်ကျန်အမှတ် (30% Share)
-      </span>
-      <div class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-300 via-sky-400 to-blue-400 tracking-tight my-1">
-        <span id="points">0</span> <span class="text-2xl font-bold text-sky-400">PTS</span>
-      </div>
-      <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-xs text-emerald-400 font-semibold">
-        <i class="fa-solid fa-wallet"></i>  $<span id="usd-balance">0.0000</span> USD
-      </div>
-      <div class="w-full bg-slate-950/60 rounded-xl p-3 border border-slate-800/50 mt-2 text-left">
-        <div class="flex justify-between text-[11px] text-slate-400 font-medium mb-1.5">
-          <span>Min Withdrawal Progress</span>
-          <span id="progress-text">0 / 30,000 PTS</span>
-        </div>
-        <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-          <div id="progress-bar" class="bg-gradient-to-r from-sky-400 to-emerald-400 h-full w-0 transition-all duration-300"></div>
-        </div>
-      </div>
-    </div>
+bot.on('message', async (ctx) => {
+    try {
+        const msg = ctx.message;
+        const chatId = msg.chat.id;
+        const text = msg.text || '';
 
-    <!-- Watch Ads Section -->
-    <div class="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-3xl p-5 shadow-2xl flex flex-col items-center text-center gap-3">
-      <div class="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 text-xl shadow-inner">
-        <i class="fa-solid fa-film"></i>
-      </div>
-      <div>
-        <h3 class="text-base font-bold text-slate-100">ဗီဒီယိုကြော်ငြာကြည့်ပါ</h3>
-        <p class="text-xs text-slate-400 mt-1">ကြော်ငြာ ၁ ကြိမ်ကြည့်လျှင် <span class="text-sky-400 font-semibold">+10 PTS</span> ရရှိမည်။</p>
-      </div>
-      <button id="watch-ad-btn" onclick="showAdsgramAd()" class="w-full py-3.5 px-4 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 active:scale-98 transition-all duration-200 text-white font-bold rounded-2xl shadow-lg shadow-sky-500/20 flex items-center justify-center gap-2 cursor-pointer">
-        <i class="fa-solid fa-circle-play text-lg"></i>
-        <span>ဗီဒီယိုကြော်ငြာကြည့်မည် (Watch Ad)</span>
-      </button>
-    </div>
+        // 1. /start ဖြင့် ဝင်လာလျှင် ကြော်ငြာချက်နှင့် Mini App ခလုတ်ပြရန်
+        if (text.startsWith('/start')) {
+            const userName = msg.from.first_name || 'User';
 
-    <!-- Friend Invite Section -->
-    <div class="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-3xl p-5 shadow-2xl flex flex-col items-center text-center gap-3">
-      <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-xl shadow-inner">
-        <i class="fa-solid fa-users"></i>
-      </div>
-      <div>
-        <h3 class="text-base font-bold text-slate-100">သူငယ်ချင်းများကို ဖိတ်ခေါ်ပါ</h3>
-        <p class="text-xs text-slate-400 mt-1">သူငယ်ချင်း ၁ ယောက် ဖိတ်လျှင် <span class="text-amber-400 font-semibold">+100 PTS</span> ရရှိမည်။</p>
-      </div>
-      
-      <div class="w-full flex gap-2">
-        <input type="text" id="ref-link-input" readonly value="Loading invite link..." class="w-full bg-slate-950/60 border border-slate-800 rounded-2xl px-3 py-2.5 text-xs text-slate-300 font-mono focus:outline-none truncate">
-        <button onclick="copyRefLink()" class="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 active:scale-98 transition-all duration-200 text-white font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 border border-slate-700 shrink-0 cursor-pointer">
-          <i class="fa-solid fa-copy"></i>
-          <span>Copy</span>
-        </button>
-      </div>
-    </div>
+            const welcomeAdsText = `
+🎉 **Tg Watch & Earn မှ ကြိုဆိုပါတယ်ခင်ဗျာ!** 🎉
 
-    <!-- Withdraw Section -->
-    <div class="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-3xl p-5 shadow-2xl flex flex-col items-center text-center gap-3">
-      <div class="flex items-center justify-between w-full text-xs text-slate-400 px-1">
-        <span class="flex items-center gap-1"><i class="fa-solid fa-shield-halved text-emerald-400"></i> Instant TON Payout</span>
-        <span>Min: 30,000 PTS ($3.00)</span>
-      </div>
-      <button id="withdraw-btn" onclick="withdrawFunds()" disabled class="w-full py-3.5 px-4 bg-slate-800 text-slate-500 font-bold rounded-2xl cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 border border-slate-800">
-        <i class="fa-solid fa-arrow-up-right-from-square"></i>
-        <span>ငွေထုတ်ယူမည် (Withdraw)</span>
-      </button>
-    </div>
-  </div>
+💎 **ဗီဒီယိုကြော်ငြာများ ကြည့်ရှုပြီး နေ့စဥ် အမှတ်များ ရှာဖွေလိုက်ပါ။**
+🚀 **သူငယ်ချင်းများကို ဖိတ်ခေါ်ပြီး အကျိုးအမြတ်များ ပိုမိုရယူလိုက်ပါ!**
 
-  <div class="text-center text-[10px] text-slate-600 mt-4 font-mono">
-    Tg Watch Mini App v1.0  Powered by Adsgram & TON
-  </div>
+အောက်ပါခလုတ်ကို နှိပ်၍ Mini App ကို စတင်လိုက်ပါ 👇
+            `;
 
-  <script>
-    const tg = window.Telegram.WebApp;
-    tg.ready();
-    tg.expand();
-
-    let userPoints = parseInt(localStorage.getItem('user_points')) || 0;
-    const POINT_RATE = 0.0001; 
-    const MIN_WITHDRAWAL = 30000;
-    let telegramUserId = null;
-
-    // Bot Username အမှန်ကို Adsgram12_bot သို့ တိုက်ရိုက်သတ်မှတ်ပေးထားသည်
-    const botUsername = "Adsgram12_bot"; 
-
-    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-        const user = tg.initDataUnsafe.user;
-        telegramUserId = user.id;
-        document.getElementById('user-greeting').innerHTML = `<i class="fa-solid fa-user text-sky-400"></i> ${user.first_name} <span class="text-slate-500">(ID: ${user.id})</span>`;
-        
-        const refLink = `https://t.me/${botUsername}?start=ref_${telegramUserId}`;
-        document.getElementById('ref-link-input').value = refLink;
-
-        fetch('/api/index', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'login', userId: telegramUserId, username: user.username })
-        }).catch(err => console.log(err));
-    } else {
-        document.getElementById('user-greeting').innerHTML = `<i class="fa-solid fa-globe text-amber-400"></i> Web Browser Preview Mode`;
-        document.getElementById('ref-link-input').value = `https://t.me/${botUsername}?start=ref_7120292163`;
-    }
-
-    function copyRefLink() {
-        const inputElement = document.getElementById('ref-link-input');
-        inputElement.select();
-        navigator.clipboard.writeText(inputElement.value);
-        
-        if (typeof tg !== 'undefined' && tg.showAlert) {
-            tg.showAlert("ဖိတ်ကြားရေးလင့်ခ်ကို ကူးယူပြီးပါပြီ! သူငယ်ချင်းများထံ ပို့ပေးပါ။");
-        } else {
-            alert("Invite link copied to clipboard!");
+            await ctx.reply(welcomeAdsText, {
+                parse_mode: "Markdown",
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            {
+                                text: "🚀 Tg Watch App ဖွင့်မည်",
+                                web_app: { url: "https://tg-watch-app.vercel.app" }
+                            }
+                        ]
+                    ]
+                }
+            });
+            return;
         }
-    }
 
-    function updateUI() {
-        document.getElementById('points').innerText = userPoints.toLocaleString();
-        document.getElementById('usd-balance').innerText = (userPoints * POINT_RATE).toFixed(4);
-        
-        const progressPercent = Math.min(100, (userPoints / MIN_WITHDRAWAL) * 100);
-        document.getElementById('progress-bar').style.width = `${progressPercent}%`;
-        document.getElementById('progress-text').innerText = `${userPoints.toLocaleString()} / ${MIN_WITHDRAWAL.toLocaleString()} PTS`;
-
-        const withdrawBtn = document.getElementById('withdraw-btn');
-        if (userPoints >= MIN_WITHDRAWAL && tonConnectUI.connected) {
-            withdrawBtn.removeAttribute('disabled');
-            withdrawBtn.className = "w-full py-3.5 px-4 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 active:scale-98 transition-all duration-200 text-white font-bold rounded-2xl shadow-lg shadow-emerald-500/20 cursor-pointer flex items-center justify-center gap-2";
-        } else {
-            withdrawBtn.setAttribute('disabled', 'true');
-            withdrawBtn.className = "w-full py-3.5 px-4 bg-slate-800 text-slate-500 font-bold rounded-2xl cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 border border-slate-800";
-        }
-        localStorage.setItem('user_points', userPoints);
-    }
-
-    const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-        manifestUrl: 'https://tg-watch-app.vercel.app/tonconnect-manifest.json',
-        buttonRootId: 'ton-connect'
-    });
-
-    tonConnectUI.onStatusChange(wallet => {
-        updateUI();
-    });
-
-    const adController = window.Adsgram.init({ 
-        blockId: "58231", 
-        debug: false 
-    });
-
-    async function showAdsgramAd() {
-        const btn = document.getElementById('watch-ad-btn');
-        btn.disabled = true;
-        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ကြော်ငြာဖွင့်နေသည်...`;
-
-        try {
-            await adController.show();
-            userPoints += 10;
-            updateUI();
-            tg.showAlert("ဂုဏ်ယူပါတယ်! ကြော်ငြာကြည့်ရှုပြီး 10 PTS ရရှိသွားပါပြီ။");
-            
-            if(telegramUserId) {
-                fetch('/api/index', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'watched_ad', userId: telegramUserId })
-                }).catch(err => console.log(err));
+        // 2. Admin ထံမှ User ဆီသို့ /reply ဖြင့် ပြန်ကြားရန်
+        if (chatId.toString() === adminChatId && text.startsWith('/reply')) {
+            const parts = text.split(' ');
+            if (parts.length < 3) {
+                return ctx.reply("❌ အသုံးပြုပုံ မှားယွင်းနေပါသည်။ ဥပမာ - /reply UserID မက်ဆေ့ချ်စာသား");
             }
-        } catch (err) {
-            tg.showAlert("ကြော်ငြာကြည့်ရှုခြင်း မပြီးဆုံးပါ သို့မဟုတ် အမှားအယွင်းရှိခဲ့ပါသည်။");
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = `<i class="fa-solid fa-circle-play text-lg"></i> <span>ဗီဒီယိုကြော်ငြာကြည့်မည် (Watch Ad)</span>`;
-        }
-    }
+            const targetUserId = parts[1];
+            const replyText = parts.slice(2).join(' ');
 
-    async function withdrawFunds() {
-        if (!tonConnectUI.connected) {
-            tg.showAlert("ကျေးဇူးပြု၍ Tonkeeper ပိုက်ဆံအိတ်ကို အရင်ချိတ်ဆက်ပါ။");
+            try {
+                await bot.telegram.sendMessage(targetUserId, `💬 **Admin မှ တုံ့ပြန်ချက်:**\n\n${replyText}`, {
+                    parse_mode: 'Markdown'
+                });
+                await ctx.reply(`✅ User (${targetUserId}) ထံသို့ စာပို့ပြီးပါပြီ။`);
+            } catch (err) {
+                await ctx.reply(`❌ ပို့၍မရပါ (User က Bot ကို Blockထားခြင်း သို့မဟုတ် Chat ဖွင့်မထားခြင်း ဖြစ်နိုင်သည်)။`);
+            }
             return;
         }
 
-        if (userPoints < MIN_WITHDRAWAL) {
-            tg.showAlert("ငွေထုတ်ရန် အနည်းဆုံး 30,000 PTS လိုအပ်ပါသည်။");
-            return;
+        // 3. User များမှ ပို့သောစာများကို Admin ဆီသို့ Forward လုပ်ရန်
+        if (chatId.toString() !== adminChatId) {
+            const userName = msg.from.first_name || 'User';
+            await bot.telegram.sendMessage(adminChatId, `📩 **မက်ဆေ့ချ်အသစ် ရောက်ရှိသည်**\n\n👤 အမည်: ${userName}\n🆔 ID: \`${chatId}\`\n💬 စာသား: ${text}`, {
+                parse_mode: 'Markdown'
+            });
+            await ctx.reply("✅ မက်ဆေ့ချ်ကို Admin ထံ ပို့ပြီးပါပြီ။ ကျေးဇူးတင်ပါသည်။");
         }
 
-        try {
-            const transaction = {
-                validUntil: Math.floor(Date.now() / 1000) + 600,
-                messages: [{
-                    address: "UQCza6oW4JvekuwTU0VkLjq_q8Ob0fJuzbQpHGkUo2VhnHUm",
-                    amount: "1000000"
-                }]
-            };
-
-            await tonConnectUI.sendTransaction(transaction);
-            tg.showAlert("ငွေထုတ်ယူမှုတောင်းဆိုမှု အောင်မြင်ပါသည်။ Admin ဘက်မှ စစ်ဆေးပြီး ပို့ဆောင်ပေးပါမည်။");
-            
-            userPoints = 0;
-            updateUI();
-        } catch (e) {
-            tg.showAlert("ငွေထုတ်ယူခြင်း ပျက်ပြားသွားပါပြီ သို့မဟုတ် ငြင်းပယ်ခံရပါသည်။");
-        }
+    } catch (e) {
+        console.error(e);
     }
+});
 
-    updateUI();
-  </script>
-</body>
-</html>
+// Vercel Serverless Function Export
+module.exports = async (req, res) => {
+    try {
+        if (req.method === 'POST') {
+            await bot.handleUpdate(req.body);
+            res.status(200).json({ status: 'ok' });
+        } else {
+            res.status(200).send('Telegram Bot Server is running successfully!');
+        }
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};
