@@ -161,17 +161,9 @@
         localStorage.setItem('user_points', userPoints);
     }
 
-    // Vercel Domain အစစ်အမှန် (tg-watch-app.vercel.app) ကို အသုံးပြုထားသော Manifest Data URL
-    const manifestJson = {
-        url: "https://tg-watch-app.vercel.app",
-        name: "Tg Watch Mini App",
-        iconUrl: "https://avatars.githubusercontent.com/u/0?v=4"
-    };
-    const manifestBase64 = btoa(JSON.stringify(manifestJson));
-    const manifestUrl = `data:application/json;base64,${manifestBase64}`;
-
+    // HTTPS လင့်ခ်အစစ်ဖြင့် TonConnect ကို ချိတ်ဆက်ခြင်း (Manifest Error အပြီးတိုင်ဖြေရှင်းရန်)
     const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-        manifestUrl: manifestUrl,
+        manifestUrl: 'https://tg-watch-app.vercel.app/tonconnect-manifest.json',
         buttonRootId: 'ton-connect'
     });
 
