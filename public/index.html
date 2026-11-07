@@ -64,7 +64,7 @@
       </button>
     </div>
 
-    <!-- Friend Invite Section (100 PTS) -->
+    <!-- Friend Invite Section -->
     <div class="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-3xl p-5 shadow-2xl flex flex-col items-center text-center gap-3">
       <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-xl shadow-inner">
         <i class="fa-solid fa-users"></i>
@@ -110,7 +110,7 @@
     const MIN_WITHDRAWAL = 30000;
     let telegramUserId = null;
 
-    const botUsername = "TgWatchBot"; // ကိုယ့်ရဲ့ Bot Username ကို ဤနေရာတွင် ထည့်ပါ
+    const botUsername = "TgWatchBot"; 
 
     if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
         const user = tg.initDataUnsafe.user;
@@ -216,7 +216,7 @@
             const transaction = {
                 validUntil: Math.floor(Date.now() / 1000) + 600,
                 messages: [{
-                    address: "YOUR_TON_ADMIN_WALLET_ADDRESS",
+                    address: "UQCza6oW4JvekuwTU0VkLjq_q8Ob0fJuzbQpHGkUo2VhnHUm",
                     amount: "1000000"
                 }]
             };
