@@ -110,7 +110,8 @@
     const MIN_WITHDRAWAL = 30000;
     let telegramUserId = null;
 
-    const botUsername = "TgWatchBot"; 
+    // Bot Username အမှန်ကို ချိတ်ဆက်ပေးထားပါပြီ
+    const botUsername = "tgwatchbot"; 
 
     if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
         const user = tg.initDataUnsafe.user;
@@ -161,7 +162,6 @@
         localStorage.setItem('user_points', userPoints);
     }
 
-    // HTTPS လင့်ခ်အစစ်ဖြင့် TonConnect ကို ချိတ်ဆက်ခြင်း (Manifest Error အပြီးတိုင်ဖြေရှင်းရန်)
     const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
         manifestUrl: 'https://tg-watch-app.vercel.app/tonconnect-manifest.json',
         buttonRootId: 'ton-connect'
