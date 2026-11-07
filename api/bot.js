@@ -1,75 +1,67 @@
-export default async function handler(req, res) {
-    // CORS Headers ခွင့်ပြုရန်
-    res.setHeader('Access-Control-Allow-Credentials', true);
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader(
-        'Access-Control-Allow-Headers',
-        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-    );
+import TelegramBot from 'node-telegram-bot-api';
 
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+// ၁။ သင့်ရဲ့ Bot Token (ပေးထားသည့်အတိုင်း)
+const token = '9296311020:AAGDaznc2OjdmhmJ010gI4nNu00EzOrrLfA';
+const bot = new TelegramBot(token, { polling: true });
+
+// ၂။ သင့်ရဲ့ Telegram User ID ကို Admin အဖြစ် သတ်မှတ်ခြင်း (ပုံထဲပါသည့် ID)
+const ADMIN_ID = 52504489;[span_2](start_span)[span_2](end_span)
+
+console.log(" Telegram Bot အောင်မြင်စွာ စတင် Run နေပါပြီ...");
+
+// ၃။ /start command နှင့် Mini App ဖွင့်ရန် ခလုတ်ပေးခြင်း
+bot.onText(/\/start(?:\s+ref_(.+))?/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const referrerId = match[1]; // Ref ဖြင့် ဝင်လာပါက ဖမ်းယူရန်
+
+  if (referrerId) {
+    console.log(`User ${chatId} သည် Referrer ${referrerId} ၏ လင့်ခ်မှ ဝင်လာပါသည်။`);
+  }
+
+  // Mini App ဖွင့်ရန် Button ပို့ပေးခြင်း (သင့် Vercel Link ကို ဤနေရာတွင် ထည့်ပါ)
+  bot.sendMessage(chatId, "ကြိုဆိုပါတယ်! အောက်ပါ Button ကိုနှိပ်ပြီး Mini App ကို ဖွင့်ပါ ", {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: " Open Watch Ads App", web_app: { url: "https://your-vercel-domain.app" } }]
+      ]
     }
+  });
+});
 
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
+// ၄။ User များက Bot ထဲသို့ စာပို့လာပါက Admin ဆီသို့ တိုက်ရိုက် Forward လုပ်ပေးခြင်း
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+  
+  // Admin ကိုယ်တိုင်ပို့တာတွေနဲ့ Command တွေ မပါလျှင်
+  if (chatId !== ADMIN_ID && !msg.text?.startsWith('/')) {
+    const userName = msg.from.first_name || 'User';
+    
+    // Admin ဆီသို့ မက်ဆေ့ခ်ျ ပို့မည်
+    await bot.sendMessage(ADMIN_ID, ` **မက်ဆေ့ခ်ျအသစ် ရောက်ရှိပါသည်**\n\n အမည်: ${userName}\n ID: \`${chatId}\`\n\n စာသား: ${msg.text}`, {
+      parse_mode: 'Markdown'
+    });
+    
+    // User ဘက်ကိုလည်း ပို့ပြီးကြောင်း အကြောင်းပြန်မည်
+    bot.sendMessage(chatId, " သင့်မက်ဆေ့ခ်ျကို Admin ထံ ပို့ပြီးပါပြီ။ အမြန်ဆုံး အကြောင်းပြန်ပါမည်။");
+  }
+});
 
-    try {
-        const update = req.body;
+// ၅။ Admin ဘက်က User ထံ ပြန်စာပို့ရန် Command 
+// အသုံးပြုပုံ (Admin Chat ထဲတွင် ရိုက်ရန်) ဥပမာ - /reply 123456789 မင်္ဂလာပါ ဘာကူညီပေးရမလဲ
+bot.onText(/\/reply (\d+) (.+)/, async (msg, match) => {
+  if (msg.chat.id !== ADMIN_ID) {
+    return bot.sendMessage(msg.chat.id, " ဤ Command ကို Admin သာ အသုံးပြုနိုင်ပါသည်။");
+  }
 
-        // Telegram က ပို့လိုက်သော Message ရှိမရှိ စစ်ဆေးခြင်း
-        if (update && update.message) {
-            const chatId = update.message.chat.id;
-            const text = update.message.text;
-            const userName = update.message.from.first_name || 'User';
+  const targetUserId = match[1]; // စာပြန်မည့် User ၏ Telegram ID
+  const replyText = match[2];     // Admin ပြောမည့် စာသား
 
-            let replyText = `မင်္ဂလာပါ ${userName}။ Tg Watch မှ ကြိုဆိုပါတယ်။ အောက်ပါခလုတ်ကိုနှိပ်၍ Mini App ကို ဖွင့်ပါ။`;
-            let replyMarkup = undefined;
-
-            // User က '/start' လို့ ပို့လာရင်
-            if (text === '/start') {
-                replyText = `မင်္ဂလာပါ ${userName} 🙏\n\n'Tg Watch' Mini App မှ ကြိုဆိုပါတယ်။ အောက်ပါခလုတ်ကိုနှိပ်၍ Mini App ကို ဖွင့်လှစ်နိုင်ပါသည်။`;
-                replyMarkup = {
-                    inline_keyboard: [
-                        [
-                            {
-                                text: ' Open Tg Watch App',
-                                web_app: { url: 'https://tg-watch-app-t6brx8e17-sismin487-1940.vercel.app' }
-                            }
-                        ]
-                    ]
-                };
-            } else if (text === '/balance') {
-                replyText = `သင့်ရဲ့ လက်ကျန်အမှတ်များကို Mini App ထဲတွင် ဝင်ရောက်စစ်ဆေးနိုင်ပါသည်။`;
-            } else {
-                replyText = `ပေးပို့ထားသော မက်ဆေ့ခ်ျကို လက်ခံရရှိပါသည်။`;
-            }
-
-            // Telegram Bot API ကို အသုံးပြု၍ အလိုအလျောက် စာပြန်ရန်
-            const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-            if (BOT_TOKEN) {
-                const payload = {
-                    chat_id: chatId,
-                    text: replyText
-                };
-
-                if (replyMarkup) {
-                    payload.reply_markup = replyMarkup;
-                }
-
-                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-            }
-        }
-
-        return res.status(200).json({ success: true });
-    } catch (error) {
-        console.error('Bot API Error:', error);
-        return res.status(500).json({ error: 'Internal Server Error' });
-    }
-}
+  try {
+    await bot.sendMessage(targetUserId, ` **Admin မှ အကြောင်းပြန်ကြားချက်:**\n\n${replyText}`, { 
+      parse_mode: 'Markdown' 
+    });
+    bot.sendMessage(ADMIN_ID, ` User (\`${targetUserId}\`) ထံသို့ စာပို့ပြီးပါပြီ။`, { parse_mode: 'Markdown' });
+  } catch (err) {
+    bot.sendMessage(ADMIN_ID, ` စာပို့၍မရပါ။ (User သည် Bot ကို Block ထားခြင်း ဖြစ်နိုင်သည်)`);
+  }
+});
