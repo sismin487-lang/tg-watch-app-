@@ -1,6 +1,0 @@
-{
-  "routes": [
-    { "src": "/tonconnect-manifest.json", "dest": "/tonconnect-manifest.json" },
-    { "src": "/(.*)", "dest": "/index.html" }
-  ]
-}
