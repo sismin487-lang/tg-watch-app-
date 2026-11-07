@@ -1,5 +1,6 @@
 {
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" }
+  "routes": [
+    { "src": "/tonconnect-manifest.json", "dest": "/tonconnect-manifest.json" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
