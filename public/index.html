@@ -161,9 +161,9 @@
         localStorage.setItem('user_points', userPoints);
     }
 
-    // Manifest Error လုံးဝကင်းစင်စေရန် Data URL အသုံးပြုထားခြင်း (မူရင်းဖိုင်ဖွဲ့စည်းပုံအပြည့်အစုံ)
+    // Vercel Domain အစစ်အမှန် (tg-watch-app.vercel.app) ကို အသုံးပြုထားသော Manifest Data URL
     const manifestJson = {
-        url: window.location.origin,
+        url: "https://tg-watch-app.vercel.app",
         name: "Tg Watch Mini App",
         iconUrl: "https://avatars.githubusercontent.com/u/0?v=4"
     };
