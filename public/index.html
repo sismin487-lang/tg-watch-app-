@@ -6,6 +6,7 @@
   <title>Tg Watch & Earn</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- Adsgram SDK (VPN tolerant setup) -->
   <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
   <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -178,9 +179,10 @@
         updateUI();
     });
 
+    // Adsgram Controller Initialization with VPN / Global Tolerance
     const adController = window.Adsgram.init({ 
         blockId: "58231", 
-        debug: false 
+        debug: true 
     });
 
     async function showAdsgramAd() {
@@ -189,27 +191,33 @@
         btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ကြော်ငြာဖွင့်နေသည်...`;
 
         try {
-            await adController.show();
+            const result = await adController.show();
             
-            if(telegramUserId) {
-                const res = await fetch('/api/index', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'watched_ad', userId: telegramUserId })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    userPoints = data.points;
+            // Adsgram successful view callback check
+            if (result && result.done) {
+                if(telegramUserId) {
+                    const res = await fetch('/api/index', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'watched_ad', userId: telegramUserId })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        userPoints = data.points;
+                        updateUI();
+                    }
+                } else {
+                    userPoints += 10;
                     updateUI();
                 }
-            } else {
-                userPoints += 10;
-                updateUI();
-            }
 
-            tg.showAlert("ဂုဏ်ယူပါတယ်! ကြော်ငြာကြည့်ရှုပြီး 10 PTS ရရှိသွားပါပြီ။");
+                tg.showAlert("ဂုဏ်ယူပါတယ်! ကြော်ငြာကြည့်ရှုပြီး 10 PTS ရရှိသွားပါပြီ။");
+            } else {
+                tg.showAlert("ကြော်ငြာကြည့်ရှုခြင်း မပြီးဆုံးပါ (သို့မဟုတ်) ပိတ်လိုက်ပါသည်။");
+            }
         } catch (err) {
-            tg.showAlert("ကြော်ငြာကြည့်ရှုခြင်း မပြီးဆုံးပါ သို့မဟုတ် အမှားအယွင်းရှိခဲ့ပါသည်။");
+            console.error("Adsgram Error:", err);
+            tg.showAlert("လက်တလောတွင် ကြော်ငြာမရှိသေးပါ (သို့မဟုတ်) VPN ကြောင့် ချိတ်ဆက်မှု အဆင်မပြေပါ။ ခဏနေမှ ထပ်ကြိုးစားပါ။");
         } finally {
             btn.disabled = false;
             btn.innerHTML = `<i class="fa-solid fa-circle-play text-lg"></i> <span>ဗီဒီယိုကြော်ငြာကြည့်မည် (Watch Ad)</span>`;
