@@ -1,8 +1,9 @@
 const { Telegraf } = require('telegraf');
 
-const token = process.env.BOT_TOKEN;
+// ဘော့စ်ပေးထားသော တိုကန်အမှန်ကို တိုက်ရိုက် ထည့်သွင်းထားပါသည်
+const token = "9296311020:AAGKeEJQv2jdjOzRlON5bV8o3OY3c-iR1hk";
 if (!token) {
-    console.error("BOT_TOKEN is not defined in environment variables!");
+    console.error("BOT_TOKEN is not defined!");
 }
 
 const bot = new Telegraf(token);
@@ -11,9 +12,24 @@ if (!global.userPoints) {
     global.userPoints = {};
 }
 
-bot.start((ctx) => {
+// Bot /start command with referral handling
+bot.start(async (ctx) => {
     const userName = ctx.from.first_name || 'User';
-    ctx.reply(`မင်္ဂလာပါ ${userName}! Tg Watch Ads & Reward Mini App မှ ကြိုဆိုပါတယ်။ ဗီဒီယိုကြည့်ပြီး ပွိုင့်များ စုဆောင်းနိုင်ပါပြီ။`, {
+    const startPayload = ctx.payload;
+
+    if (startPayload && startPayload.startsWith('ref_')) {
+        const referrerId = startPayload.replace('ref_', '');
+        const currentUserId = ctx.from.id.toString();
+
+        if (referrerId !== currentUserId) {
+            if (!global.userPoints[referrerId]) {
+                global.userPoints[referrerId] = 0;
+            }
+            global.userPoints[referrerId] += 100;
+        }
+    }
+
+    await ctx.reply(`မင်္ဂလာပါ ${userName}! Tg Watch & Earn Mini App မှ ကြိုဆိုပါတယ်။ ဗီဒီယိုကြည့်ပြီး ပွိုင့်များ စုဆောင်းနိုင်ပါပြီ။`, {
         reply_markup: {
             inline_keyboard: [
                 [{ text: "🚀 Open Mini App", web_app: { url: "https://tg-watch-app.vercel.app" } }]
@@ -28,11 +44,23 @@ module.exports = async (req, res) => {
             const body = req.body || {};
             const { action, userId } = body;
             
+            if (action === 'login' || action === 'get_points') {
+                if (!userId) {
+                    return res.status(400).json({ success: false, error: "Missing userId" });
+                }
+                if (!global.userPoints[userId]) {
+                    global.userPoints[userId] = 0;
+                }
+                return res.status(200).json({ 
+                    success: true, 
+                    points: global.userPoints[userId] 
+                });
+            }
+
             if (action === 'watched_ad') {
                 if (!userId) {
                     return res.status(400).json({ success: false, error: "Missing userId" });
                 }
-                
                 if (!global.userPoints[userId]) {
                     global.userPoints[userId] = 0;
                 }
@@ -43,13 +71,7 @@ module.exports = async (req, res) => {
                     points: global.userPoints[userId] 
                 });
             }
-            
-            if (action === 'get_points') {
-                const points = global.userPoints[userId] || 0;
-                return res.status(200).json({ success: true, points });
-            }
 
-            // Handle standard Telegram webhook updates
             if (body.update_id) {
                 await bot.handleUpdate(body);
                 return res.status(200).json({ status: 'ok' });
