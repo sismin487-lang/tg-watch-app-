@@ -14,16 +14,13 @@ bot.start(async (ctx) => {
             const referrerId = parts[1].replace('ref_', '');
             
             if (referrerId !== userId) {
-                // Check if this user was already referred by anyone
                 const alreadyReferred = await kv.sismember(`referred:${referrerId}`, userId);
                 const hasBeenReferredAnywhere = await kv.get(`user_referred_status:${userId}`);
 
                 if (!alreadyReferred && !hasBeenReferredAnywhere) {
-                    // Mark user as referred
                     await kv.sadd(`referred:${referrerId}`, userId);
                     await kv.set(`user_referred_status:${userId}`, 'yes');
 
-                    // Add 100 points to referrer
                     const currentPoints = await kv.get(`points:${referrerId}`) || 0;
                     const newPoints = Number(currentPoints) + 100;
                     await kv.set(`points:${referrerId}`, newPoints);
@@ -57,26 +54,12 @@ bot.on('message', async (ctx) => {
         const userId = ctx.from.id.toString();
         const userName = ctx.from.first_name || 'User';
 
-        if (chatId === adminChatId) {
-            if (msg.reply_to_message) {
-                const repliedText = msg.reply_to_message.text || '';
-                const match = repliedText.match(/ID:\s*(\d+)/);
-                if (match && match[1]) {
-                    const targetUserId = match[1];
-                    await bot.telegram.sendMessage(targetUserId, `Admin မှ တုံ့ပြန်ချက်:\n\n${text}`);
-                    await ctx.reply(`✅ User (${targetUserId}) ထံသို့ စာပို့ပြီးပါပြီ။`);
-                    return;
-                }
-            }
-
-            if (text.startsWith('/reply')) {
-                const parts = text.split(' ');
-                if (parts.length < 3) {
-                    return ctx.reply("❌ ဥပမာ - /reply UserID မက်ဆေ့ချ်စာသား");
-                }
-                const targetUserId = parts[1];
-                const replyText = parts.slice(2).join(' ');
-                await bot.telegram.sendMessage(targetUserId, `Admin မှ တုံ့ပြန်ချက်:\n\n${replyText}`);
+        if (chatId === adminChatId && msg.reply_to_message) {
+            const repliedText = msg.reply_to_message.text || '';
+            const match = repliedText.match(/ID:\s*(\d+)/);
+            if (match && match[1]) {
+                const targetUserId = match[1];
+                await bot.telegram.sendMessage(targetUserId, `Admin မှ တုံ့ပြန်ချက်:\n\n${text}`);
                 await ctx.reply(`✅ User (${targetUserId}) ထံသို့ စာပို့ပြီးပါပြီ။`);
                 return;
             }
@@ -95,9 +78,10 @@ module.exports = async (req, res) => {
         if (req.method === 'POST') {
             const body = req.body;
             
-            if (body && body.action === 'send_admin_msg') {
-                await bot.telegram.sendMessage(adminChatId, `Mini App မှ Direct Message\n\nUser ID: ${body.userId}\nစာသား: ${body.message}`);
-                return res.status(200).json({ success: true });
+            if (body && body.action === 'login') {
+                const userId = body.userId;
+                const points = await kv.get(`points:${userId}`) || 0;
+                return res.status(200).json({ success: true, points: Number(points) });
             }
 
             if (body && body.action === 'watched_ad') {
