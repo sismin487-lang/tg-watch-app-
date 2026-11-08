@@ -179,10 +179,10 @@
         updateUI();
     });
 
-    // Adsgram Controller Initialization with VPN / Global Tolerance
+    // Adsgram Controller Initialization with Robust Auto-Retry & VPN Tolerance
     const adController = window.Adsgram.init({ 
         blockId: "58231", 
-        debug: true 
+        debug: false 
     });
 
     async function showAdsgramAd() {
@@ -190,12 +190,29 @@
         btn.disabled = true;
         btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ကြော်ငြာဖွင့်နေသည်...`;
 
-        try {
-            const result = await adController.show();
-            
-            // Adsgram successful view callback check
-            if (result && result.done) {
-                if(telegramUserId) {
+        let adSuccess = false;
+        let attempts = 0;
+        const maxAttempts = 2; // Network error တွေအတွက် နှစ်ကြိမ်အထိ ထပ်မံကြိုးစားပေးမည့် စနစ်
+
+        while (attempts < maxAttempts && !adSuccess) {
+            attempts++;
+            try {
+                const result = await adController.show();
+                if (result && result.done) {
+                    adSuccess = true;
+                }
+            } catch (err) {
+                console.log(`Attempt ${attempts} failed:`, err);
+                if (attempts < maxAttempts) {
+                    // ခဏစောင့်ပြီး ထပ်ကြိုးစားမည်
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+        }
+
+        if (adSuccess) {
+            if(telegramUserId) {
+                try {
                     const res = await fetch('/api/index', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -206,22 +223,22 @@
                         userPoints = data.points;
                         updateUI();
                     }
-                } else {
+                } catch (e) {
                     userPoints += 10;
                     updateUI();
                 }
-
-                tg.showAlert("ဂုဏ်ယူပါတယ်! ကြော်ငြာကြည့်ရှုပြီး 10 PTS ရရှိသွားပါပြီ။");
             } else {
-                tg.showAlert("ကြော်ငြာကြည့်ရှုခြင်း မပြီးဆုံးပါ (သို့မဟုတ်) ပိတ်လိုက်ပါသည်။");
+                userPoints += 10;
+                updateUI();
             }
-        } catch (err) {
-            console.error("Adsgram Error:", err);
+
+            tg.showAlert("ဂုဏ်ယူပါတယ်! ကြော်ငြာကြည့်ရှုပြီး 10 PTS ရရှိသွားပါပြီ။");
+        } else {
             tg.showAlert("လက်တလောတွင် ကြော်ငြာမရှိသေးပါ (သို့မဟုတ်) VPN ကြောင့် ချိတ်ဆက်မှု အဆင်မပြေပါ။ ခဏနေမှ ထပ်ကြိုးစားပါ။");
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = `<i class="fa-solid fa-circle-play text-lg"></i> <span>ဗီဒီယိုကြော်ငြာကြည့်မည် (Watch Ad)</span>`;
         }
+
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-circle-play text-lg"></i> <span>ဗီဒီယိုကြော်ငြာကြည့်မည် (Watch Ad)</span>`;
     }
 
     async function withdrawFunds() {
