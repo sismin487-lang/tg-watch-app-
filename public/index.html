@@ -109,32 +109,35 @@
     const MIN_WITHDRAWAL = 30000;
     let telegramUserId = null;
     let userPoints = 0;
-    let storageKey = 'user_points_guest';
-
-    // Bot Username အမှန်ကို Adsgram12_bot သို့ ချိတ်ဆက်ပေးထားသည်
     const botUsername = "Adsgram12_bot"; 
 
     if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
         const user = tg.initDataUnsafe.user;
         telegramUserId = user.id;
-        storageKey = `user_points_${telegramUserId}`;
-        userPoints = parseInt(localStorage.getItem(storageKey)) || 0;
 
         document.getElementById('user-greeting').innerHTML = `<i class="fa-solid fa-user text-sky-400"></i> ${user.first_name} <span class="text-slate-500">(ID: ${user.id})</span>`;
         
         const refLink = `https://t.me/${botUsername}?start=ref_${telegramUserId}`;
         document.getElementById('ref-link-input').value = refLink;
 
+        // Fetch actual user points from Vercel KV Database
         fetch('/api/index', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'login', userId: telegramUserId, username: user.username })
-        }).catch(err => console.log(err));
+            body: JSON.stringify({ action: 'login', userId: telegramUserId })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                userPoints = data.points;
+                updateUI();
+            }
+        })
+        .catch(err => console.log(err));
     } else {
-        storageKey = 'user_points_preview';
-        userPoints = parseInt(localStorage.getItem(storageKey)) || 0;
         document.getElementById('user-greeting').innerHTML = `<i class="fa-solid fa-globe text-amber-400"></i> Web Browser Preview Mode`;
         document.getElementById('ref-link-input').value = `https://t.me/${botUsername}?start=ref_52504489`;
+        updateUI();
     }
 
     function copyRefLink() {
@@ -165,7 +168,6 @@
             withdrawBtn.setAttribute('disabled', 'true');
             withdrawBtn.className = "w-full py-3.5 px-4 bg-slate-800 text-slate-500 font-bold rounded-2xl cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 border border-slate-800";
         }
-        localStorage.setItem(storageKey, userPoints);
     }
 
     const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
@@ -189,17 +191,24 @@
 
         try {
             await adController.show();
-            userPoints += 10;
-            updateUI();
-            tg.showAlert("ဂုဏ်ယူပါတယ်! ကြော်ငြာကြည့်ရှုပြီး 10 PTS ရရှိသွားပါပြီ။");
             
             if(telegramUserId) {
-                fetch('/api/index', {
+                const res = await fetch('/api/index', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'watched_ad', userId: telegramUserId })
-                }).catch(err => console.log(err));
+                });
+                const data = await res.json();
+                if (data.success) {
+                    userPoints = data.points;
+                    updateUI();
+                }
+            } else {
+                userPoints += 10;
+                updateUI();
             }
+
+            tg.showAlert("ဂုဏ်ယူပါတယ်! ကြော်ငြာကြည့်ရှုပြီး 10 PTS ရရှိသွားပါပြီ။");
         } catch (err) {
             tg.showAlert("ကြော်ငြာကြည့်ရှုခြင်း မပြီးဆုံးပါ သို့မဟုတ် အမှားအယွင်းရှိခဲ့ပါသည်။");
         } finally {
@@ -237,8 +246,6 @@
             tg.showAlert("ငွေထုတ်ယူခြင်း ပျက်ပြားသွားပါပြီ သို့မဟုတ် ငြင်းပယ်ခံရပါသည်။");
         }
     }
-
-    updateUI();
   </script>
 </body>
 </html>
