@@ -1,7 +1,7 @@
 const { Telegraf } = require('telegraf');
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
-const adminChatId = "52504489"; // သင့်ရဲ့ Admin Telegram ID အမှန်
+const adminChatId = "52504489";
 
 global.dbPoints = global.dbPoints || {};
 global.referredUsers = global.referredUsers || new Set();
@@ -18,32 +18,17 @@ bot.start(async (ctx) => {
                 global.referredUsers.add(userId);
                 global.dbPoints[referrerId] = (global.dbPoints[referrerId] || 0) + 100;
                 try {
-                    await bot.telegram.sendMessage(referrerId, `🎉 **ဂုဏ်ယူပါတယ်ခင်ဗျာ!**\n\nသင့်ရဲ့ ဖိတ်ကြားရေးလင့်ခ်မှတဆင့် သူငယ်ချင်းအသစ် ဝင်ရောက်လာလို့ **+100 PTS** ရရှိသွားပါပြီ။ 🎁`, {
-                        parse_mode: 'Markdown'
-                    });
+                    await bot.telegram.sendMessage(referrerId, `ဂုဏ်ယူပါတယ်!\n\nသင့်ရဲ့ ဖိတ်ကြားရေးလင့်ခ်မှတဆင့် သူငယ်ချင်းအသစ် ဝင်ရောက်လာလို့ +100 PTS ရရှိသွားပါပြီ။`);
                 } catch (e) {}
             }
         }
 
-        const welcomeAdsText = `
-🎉 **Tg Watch & Earn မှ ကြိုဆိုပါတယ်ခင်ဗျာ!** 🎉
-
-💎 **ဗီဒီယိုကြော်ငြာများ ကြည့်ရှုပြီး နေ့စဥ် အမှတ်များ ရှာဖွေလိုက်ပါ။**
-🚀 **သူငယ်ချင်းများကို ဖိတ်ခေါ်ပြီး အကျိုးအမြတ်များ ပိုမိုရယူလိုက်ပါ!**
-
-အောက်ပါခလုတ်ကို နှိပ်၍ Mini App ကို စတင်လိုက်ပါ 👇
-        `;
+        const welcomeAdsText = `Tg Watch & Earn မှ ကြိုဆိုပါတယ်ဗျာ!\n\nဗီဒီယိုကြော်ငြာများ ကြည့်ရှုပြီး နေ့စဥ် အမှတ်များ ရှာဖွေလိုက်ပါ။\nသူငယ်ချင်းများကို ဖိတ်ခေါ်ပြီး အကျိုးအမြတ်များ ပိုမိုရယူလိုက်ပါ!\n\nအောက်ပါခလုတ်ကို နှိပ်၍ Mini App ကို စတင်လိုက်ပါ 👇`;
         
         await ctx.reply(welcomeAdsText, {
-            parse_mode: "Markdown",
             reply_markup: {
                 inline_keyboard: [
-                    [
-                        {
-                            text: "🚀 Tg Watch App ဖွင့်မည်",
-                            web_app: { url: "https://tg-watch-app.vercel.app" }
-                        }
-                    ]
+                    [{ text: "🚀 Tg Watch App ဖွင့်မည်", web_app: { url: "https://tg-watch-app.vercel.app" } }]
                 ]
             }
         });
@@ -63,10 +48,10 @@ bot.on('message', async (ctx) => {
         if (chatId === adminChatId) {
             if (msg.reply_to_message) {
                 const repliedText = msg.reply_to_message.text || '';
-                const match = repliedText.match(/ID:\s*`?(\d+)`?/);
+                const match = repliedText.match(/ID:\s*(\d+)/);
                 if (match && match[1]) {
                     const targetUserId = match[1];
-                    await bot.telegram.sendMessage(targetUserId, `💬 **Admin မှ တုံ့ပြန်ချက်:**\n\n${text}`, { parse_mode: 'Markdown' });
+                    await bot.telegram.sendMessage(targetUserId, `Admin မှ တုံ့ပြန်ချက်:\n\n${text}`);
                     await ctx.reply(`✅ User (${targetUserId}) ထံသို့ စာပို့ပြီးပါပြီ။`);
                     return;
                 }
@@ -75,18 +60,18 @@ bot.on('message', async (ctx) => {
             if (text.startsWith('/reply')) {
                 const parts = text.split(' ');
                 if (parts.length < 3) {
-                    return ctx.reply("❌ အသုံးပြုပုံ မှားယွင်းနေပါသည်။ ဥပမာ - /reply UserID မက်ဆေ့ချ်စာသား");
+                    return ctx.reply("❌ ဥပမာ - /reply UserID မက်ဆေ့ချ်စာသား");
                 }
                 const targetUserId = parts[1];
                 const replyText = parts.slice(2).join(' ');
-                await bot.telegram.sendMessage(targetUserId, `💬 **Admin မှ တုံ့ပြန်ချက်:**\n\n${replyText}`, { parse_mode: 'Markdown' });
+                await bot.telegram.sendMessage(targetUserId, `Admin မှ တုံ့ပြန်ချက်:\n\n${replyText}`);
                 await ctx.reply(`✅ User (${targetUserId}) ထံသို့ စာပို့ပြီးပါပြီ။`);
                 return;
             }
         }
 
         if (chatId !== adminChatId && !text.startsWith('/start')) {
-            await bot.telegram.sendMessage(adminChatId, `📩 **မက်ဆေ့ချ်အသစ် ရောက်ရှိသည်**\n\n👤 အမည်: ${userName}\n🆔 ID: \`${userId}\`\n💬 စာသား: ${text}`, { parse_mode: 'Markdown' });
+            await bot.telegram.sendMessage(adminChatId, `မက်ဆေ့ချ်အသစ် ရောက်ရှိသည်\n\nအမည်: ${userName}\nID: ${userId}\nစာသား: ${text}`);
         }
     } catch (e) {
         console.error("Message handler error:", e);
@@ -99,7 +84,7 @@ module.exports = async (req, res) => {
             const body = req.body;
             
             if (body && body.action === 'send_admin_msg') {
-                await bot.telegram.sendMessage(adminChatId, `📩 **Mini App မှ Direct Message**\n\n🆔 User ID: \`${body.userId}\`\n💬 စာသား: ${body.message}`, { parse_mode: 'Markdown' });
+                await bot.telegram.sendMessage(adminChatId, `Mini App မှ Direct Message\n\nUser ID: ${body.userId}\nစာသား: ${body.message}`);
                 return res.status(200).json({ success: true });
             }
 
