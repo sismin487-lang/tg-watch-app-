@@ -1,10 +1,8 @@
 const { Telegraf } = require('telegraf');
+const { kv } = require('@vercel/kv');
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const adminChatId = "52504489";
-
-global.dbPoints = global.dbPoints || {};
-global.referredUsers = global.referredUsers || new Set();
 
 bot.start(async (ctx) => {
     try {
@@ -14,12 +12,26 @@ bot.start(async (ctx) => {
         
         if (parts.length > 1 && parts[1].startsWith('ref_')) {
             const referrerId = parts[1].replace('ref_', '');
-            if (referrerId !== userId && !global.referredUsers.has(userId)) {
-                global.referredUsers.add(userId);
-                global.dbPoints[referrerId] = (global.dbPoints[referrerId] || 0) + 100;
-                try {
-                    await bot.telegram.sendMessage(referrerId, `ဂုဏ်ယူပါတယ်!\n\nသင့်ရဲ့ ဖိတ်ကြားရေးလင့်ခ်မှတဆင့် သူငယ်ချင်းအသစ် ဝင်ရောက်လာလို့ +100 PTS ရရှိသွားပါပြီ။`);
-                } catch (e) {}
+            
+            if (referrerId !== userId) {
+                // Check if this user was already referred by anyone
+                const alreadyReferred = await kv.sismember(`referred:${referrerId}`, userId);
+                const hasBeenReferredAnywhere = await kv.get(`user_referred_status:${userId}`);
+
+                if (!alreadyReferred && !hasBeenReferredAnywhere) {
+                    // Mark user as referred
+                    await kv.sadd(`referred:${referrerId}`, userId);
+                    await kv.set(`user_referred_status:${userId}`, 'yes');
+
+                    // Add 100 points to referrer
+                    const currentPoints = await kv.get(`points:${referrerId}`) || 0;
+                    const newPoints = Number(currentPoints) + 100;
+                    await kv.set(`points:${referrerId}`, newPoints);
+
+                    try {
+                        await bot.telegram.sendMessage(referrerId, `ဂုဏ်ယူပါတယ်!\n\nသင့်ရဲ့ ဖိတ်ကြားရေးလင့်ခ်မှတဆင့် သူငယ်ချင်းအသစ် ဝင်ရောက်လာလို့ +100 PTS ရရှိသွားပါပြီ။ လက်ရှိစုစုပေါင်း: ${newPoints} PTS`);
+                    } catch (e) {}
+                }
             }
         }
 
@@ -89,8 +101,11 @@ module.exports = async (req, res) => {
             }
 
             if (body && body.action === 'watched_ad') {
-                global.dbPoints[body.userId] = (global.dbPoints[body.userId] || 0) + 10;
-                return res.status(200).json({ success: true, points: global.dbPoints[body.userId] });
+                const userId = body.userId;
+                const currentPoints = await kv.get(`points:${userId}`) || 0;
+                const newPoints = Number(currentPoints) + 10;
+                await kv.set(`points:${userId}`, newPoints);
+                return res.status(200).json({ success: true, points: newPoints });
             }
 
             await bot.handleUpdate(body);
