@@ -1,104 +1,68 @@
 const { Telegraf } = require('telegraf');
-const { kv } = require('@vercel/kv');
 
-const bot = new Telegraf(process.env.BOT_TOKEN);
-const adminChatId = "52504489";
+const token = process.env.BOT_TOKEN;
+if (!token) {
+    console.error("BOT_TOKEN is not defined in environment variables!");
+}
 
-bot.start(async (ctx) => {
-    try {
-        const userId = ctx.from.id.toString();
-        const text = ctx.message.text || '';
-        const parts = text.split(' ');
-        
-        if (parts.length > 1 && parts[1].startsWith('ref_')) {
-            const referrerId = parts[1].replace('ref_', '');
-            
-            if (referrerId !== userId) {
-                const alreadyReferred = await kv.sismember(`referred:${referrerId}`, userId);
-                const hasBeenReferredAnywhere = await kv.get(`user_referred_status:${userId}`);
+const bot = new Telegraf(token);
 
-                if (!alreadyReferred && !hasBeenReferredAnywhere) {
-                    await kv.sadd(`referred:${referrerId}`, userId);
-                    await kv.set(`user_referred_status:${userId}`, 'yes');
+if (!global.userPoints) {
+    global.userPoints = {};
+}
 
-                    const currentPoints = await kv.get(`points:${referrerId}`) || 0;
-                    const newPoints = Number(currentPoints) + 100;
-                    await kv.set(`points:${referrerId}`, newPoints);
-
-                    try {
-                        await bot.telegram.sendMessage(referrerId, `ဂုဏ်ယူပါတယ်!\n\nသင့်ရဲ့ ဖိတ်ကြားရေးလင့်ခ်မှတဆင့် သူငယ်ချင်းအသစ် ဝင်ရောက်လာလို့ +100 PTS ရရှိသွားပါပြီ။ လက်ရှိစုစုပေါင်း: ${newPoints} PTS`);
-                    } catch (e) {}
-                }
-            }
+bot.start((ctx) => {
+    const userName = ctx.from.first_name || 'User';
+    ctx.reply(`မင်္ဂလာပါ ${userName}! Tg Watch Ads & Reward Mini App မှ ကြိုဆိုပါတယ်။ ဗီဒီယိုကြည့်ပြီး ပွိုင့်များ စုဆောင်းနိုင်ပါပြီ။`, {
+        reply_markup: {
+            inline_keyboard: [
+                [{ text: "🚀 Open Mini App", web_app: { url: "https://tg-watch-app.vercel.app" } }]
+            ]
         }
-
-        const welcomeAdsText = `Tg Watch & Earn မှ ကြိုဆိုပါတယ်ဗျာ!\n\nဗီဒီယိုကြော်ငြာများ ကြည့်ရှုပြီး နေ့စဥ် အမှတ်များ ရှာဖွေလိုက်ပါ။\nသူငယ်ချင်းများကို ဖိတ်ခေါ်ပြီး အကျိုးအမြတ်များ ပိုမိုရယူလိုက်ပါ!\n\nအောက်ပါခလုတ်ကို နှိပ်၍ Mini App ကို စတင်လိုက်ပါ 👇`;
-        
-        await ctx.reply(welcomeAdsText, {
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: "🚀 Tg Watch App ဖွင့်မည်", web_app: { url: "https://tg-watch-app.vercel.app" } }]
-                ]
-            }
-        });
-    } catch (e) {
-        console.error("Start command error:", e);
-    }
-});
-
-bot.on('message', async (ctx) => {
-    try {
-        const msg = ctx.message;
-        const chatId = msg.chat.id.toString();
-        const text = msg.text || '';
-        const userId = ctx.from.id.toString();
-        const userName = ctx.from.first_name || 'User';
-
-        if (chatId === adminChatId && msg.reply_to_message) {
-            const repliedText = msg.reply_to_message.text || '';
-            const match = repliedText.match(/ID:\s*(\d+)/);
-            if (match && match[1]) {
-                const targetUserId = match[1];
-                await bot.telegram.sendMessage(targetUserId, `Admin မှ တုံ့ပြန်ချက်:\n\n${text}`);
-                await ctx.reply(`✅ User (${targetUserId}) ထံသို့ စာပို့ပြီးပါပြီ။`);
-                return;
-            }
-        }
-
-        if (chatId !== adminChatId && !text.startsWith('/start')) {
-            await bot.telegram.sendMessage(adminChatId, `မက်ဆေ့ချ်အသစ် ရောက်ရှိသည်\n\nအမည်: ${userName}\nID: ${userId}\nစာသား: ${text}`);
-        }
-    } catch (e) {
-        console.error("Message handler error:", e);
-    }
+    });
 });
 
 module.exports = async (req, res) => {
     try {
         if (req.method === 'POST') {
-            const body = req.body;
+            const body = req.body || {};
+            const { action, userId } = body;
             
-            if (body && body.action === 'login') {
-                const userId = body.userId;
-                const points = await kv.get(`points:${userId}`) || 0;
-                return res.status(200).json({ success: true, points: Number(points) });
+            if (action === 'watched_ad') {
+                if (!userId) {
+                    return res.status(400).json({ success: false, error: "Missing userId" });
+                }
+                
+                if (!global.userPoints[userId]) {
+                    global.userPoints[userId] = 0;
+                }
+                global.userPoints[userId] += 10;
+                
+                return res.status(200).json({ 
+                    success: true, 
+                    points: global.userPoints[userId] 
+                });
+            }
+            
+            if (action === 'get_points') {
+                const points = global.userPoints[userId] || 0;
+                return res.status(200).json({ success: true, points });
             }
 
-            if (body && body.action === 'watched_ad') {
-                const userId = body.userId;
-                const currentPoints = await kv.get(`points:${userId}`) || 0;
-                const newPoints = Number(currentPoints) + 10;
-                await kv.set(`points:${userId}`, newPoints);
-                return res.status(200).json({ success: true, points: newPoints });
+            // Handle standard Telegram webhook updates
+            if (body.update_id) {
+                await bot.handleUpdate(body);
+                return res.status(200).json({ status: 'ok' });
             }
+        }
 
-            await bot.handleUpdate(body);
-            return res.status(200).json({ status: 'ok' });
-        } else {
+        if (req.method === 'GET') {
             return res.status(200).send('Telegram Bot Server is running successfully!');
         }
-    } catch (e) {
-        console.error("Webhook error:", e);
-        return res.status(500).json({ error: e.message });
+
+        return res.status(200).json({ status: 'received' });
+    } catch (error) {
+        console.error("Error handling request:", error);
+        return res.status(500).json({ error: error.message });
     }
 };
