@@ -128,7 +128,13 @@
     let userPoints = 0;
     const botUsername = "Adsgram12_bot"; 
 
-    // User Identification & Strict Wallet Session Isolation
+    // TonConnect UI Initialization
+    const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+        manifestUrl: 'https://tg-watch-app.vercel.app/tonconnect-manifest.json',
+        buttonRootId: 'ton-connect'
+    });
+
+    // User Identification & Wallet Session Isolation (Only clears when switching to a different user)
     if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
         const user = tg.initDataUnsafe.user;
         telegramUserId = user.id;
@@ -138,29 +144,17 @@
         const refLink = `https://t.me/${botUsername}/app?startapp=ref_${telegramUserId}`;
         document.getElementById('ref-link-input').value = refLink;
 
-        // 🛠️ အပြည့်အစုံ ရှင်းလင်းခြင်း: User ID ပြောင်းသွားပါက TonConnect ၏ LocalStorage, SessionStorage နှင့် IndexedDB များကို အမြစ်ပြတ်ဖယ်ရှားခြင်း
+        // Check if a DIFFERENT user is logging in on the same device
         const lastActiveUser = localStorage.getItem('last_telegram_user_id');
         if (lastActiveUser && lastActiveUser !== telegramUserId.toString()) {
-            // 1. LocalStorage ထဲက TonConnect ဆိုင်ရာ အချက်အလက်များ အကုန်ဖျက်မည်
             const keysToRemove = [];
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
-                if (key && (key.includes('ton') || key.includes('tc-') || key.includes('wallet') || key.includes('connect'))) {
+                if (key && (key.includes('ton-connect') || key.includes('tc-') || key.includes('tonconnect'))) {
                     keysToRemove.push(key);
                 }
             }
             keysToRemove.forEach(k => localStorage.removeItem(k));
-
-            // 2. Browser IndexedDB (TonConnect Cache) များကို လိုက်လံဖျက်ဆီးခြင်း
-            if (window.indexedDB && indexedDB.databases) {
-                indexedDB.databases().then(databases => {
-                    databases.forEach(db => {
-                        if (db.name && (db.name.includes('ton') || db.name.includes('tc-') || db.name.includes('wallet'))) {
-                            indexedDB.deleteDatabase(db.name);
-                        }
-                    });
-                }).catch(e => console.log("IndexedDB clean error"));
-            }
         }
         localStorage.setItem('last_telegram_user_id', telegramUserId.toString());
 
@@ -235,11 +229,6 @@
             withdrawBtn.className = "w-full py-3.5 px-4 bg-slate-800 text-slate-500 font-bold rounded-2xl cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 border border-slate-800";
         }
     }
-
-    const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-        manifestUrl: 'https://tg-watch-app.vercel.app/tonconnect-manifest.json',
-        buttonRootId: 'ton-connect'
-    });
 
     tonConnectUI.onStatusChange(wallet => {
         updateUI();
