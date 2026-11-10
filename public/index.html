@@ -135,7 +135,6 @@
 
         document.getElementById('user-greeting').innerHTML = `<i class="fa-solid fa-user text-sky-400"></i> ${user.first_name} <span class="text-slate-500">(ID: ${user.id})</span>`;
         
-        // Mini App Direct App Link (WebApp /app?startapp=ref_ID) ကို သုံးပေးခြင်းဖြင့် referral ချက်ချင်းဝင်စေမည်
         const refLink = `https://t.me/${botUsername}/app?startapp=ref_${telegramUserId}`;
         document.getElementById('ref-link-input').value = refLink;
 
@@ -145,11 +144,9 @@
             updateUI();
         }
 
-        // 🛠️ startPayload ကို Telegram SDK (initDataUnsafe.start_param) အပြင် URL query ထဲက 'startapp' နဲ့ 'start' ပါ သေချာဖမ်းရန်
         const urlParams = new URLSearchParams(window.location.search);
         const startPayload = tg.initDataUnsafe?.start_param || urlParams.get('startapp') || urlParams.get('start') || "";
 
-        // Server API ဆီသို့ login နှင့် startPayload (ref_ID) ကို ပို့ပေးမည်
         fetch('/api/index', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -222,7 +219,7 @@
         updateUI();
     });
 
-    // Adsgram Controller Initialization with Robust Auto-Retry & VPN Tolerance
+    // Adsgram Controller Initialization
     const adController = window.Adsgram.init({ 
         blockId: "58231", 
         debug: false 
@@ -240,7 +237,9 @@
         while (attempts < maxAttempts && !adSuccess) {
             attempts++;
             try {
-                const result = await adController.show();
+                // 🛠️ User ID ကို Adsgram SDK ဆီသို့ ထည့်သွင်းပေးခြင်း
+                const adParams = telegramUserId ? { userId: telegramUserId.toString() } : {};
+                const result = await adController.show(adParams);
                 if (result && result.done) {
                     adSuccess = true;
                 }
