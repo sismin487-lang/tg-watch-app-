@@ -128,7 +128,13 @@
     let userPoints = 0;
     const botUsername = "Adsgram12_bot"; 
 
-    // User Identification & LocalStorage Persistent Sync
+    // TonConnect UI Initialization
+    const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+        manifestUrl: 'https://tg-watch-app.vercel.app/tonconnect-manifest.json',
+        buttonRootId: 'ton-connect'
+    });
+
+    // User Identification & Wallet Session Isolation
     if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
         const user = tg.initDataUnsafe.user;
         telegramUserId = user.id;
@@ -137,6 +143,16 @@
         
         const refLink = `https://t.me/${botUsername}/app?startapp=ref_${telegramUserId}`;
         document.getElementById('ref-link-input').value = refLink;
+
+        //  အခြား User တစ်ဦး၏ Wallet Session ကပ်ပါမလာစေရန် စစ်ဆေးပြီး ဖြုတ်ချခြင်း
+        const lastActiveUser = localStorage.getItem('last_telegram_user_id');
+        if (lastActiveUser && lastActiveUser !== telegramUserId.toString()) {
+            // User အသစ်ပြောင်းဝင်လာပါက TonConnect ကို အလိုအလျောက် Disconnect လုပ်ပေးမည်
+            if (tonConnectUI.connected) {
+                tonConnectUI.disconnect().catch(e => console.log("Disconnect error"));
+            }
+        }
+        localStorage.setItem('last_telegram_user_id', telegramUserId.toString());
 
         const savedPoints = localStorage.getItem(`tg_watch_points_${telegramUserId}`);
         if (savedPoints !== null) {
@@ -197,7 +213,7 @@
         document.getElementById('usd-balance').innerText = (userPoints * POINT_RATE).toFixed(4);
         
         const progressPercent = Math.min(100, (userPoints / MIN_WITHDRAWAL) * 100);
-        document.getElementById('progress-bar').style.width = `${progressPercent}`;
+        document.getElementById('progress-bar').style.width = `${progressPercent}%`;
         document.getElementById('progress-text').innerText = `${userPoints.toLocaleString()} / ${MIN_WITHDRAWAL.toLocaleString()} PTS`;
 
         const withdrawBtn = document.getElementById('withdraw-btn');
@@ -210,22 +226,7 @@
         }
     }
 
-    const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-        manifestUrl: 'https://tg-watch-app.vercel.app/tonconnect-manifest.json',
-        buttonRootId: 'ton-connect'
-    });
-
-    // 🛠️ ဤနေရာတွင် Wallet ချိတ်ဆက်မှုကို Telegram ID အလိုက် သီးသန့်ဖြစ်အောင် ထည့်သွင်းထားပါသည်
     tonConnectUI.onStatusChange(wallet => {
-        if (wallet) {
-            if (telegramUserId) {
-                localStorage.setItem(`connected_wallet_${telegramUserId}`, JSON.stringify(wallet));
-            }
-        } else {
-            if (telegramUserId) {
-                localStorage.removeItem(`connected_wallet_${telegramUserId}`);
-            }
-        }
         updateUI();
     });
 
