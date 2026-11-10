@@ -47,14 +47,12 @@ module.exports = async (req, res) => {
                     await redis.set(userKey, points);
                 }
 
-                // 🛠 Referral စစ်ဆေးခြင်းနှင့် ပွိုင့်ပေါင်းထည့်ခြင်း
+                // Referral စစ်ဆေးခြင်းနှင့် ပွိုင့်ပေါင်းထည့်ခြင်း (+100 PTS)
                 if (action === 'login' && startPayload) {
-                    // ref_ ပါသည်ဖြစ်စေ၊ ID သက်သက်ဖြစ်စေ ဖြုတ်ထုတ်ပြီး referrerId ကို သေချာထုတ်ယူမည်
                     const referrerId = startPayload.toString().replace('ref_', '').trim();
                     const isRefChecked = await redis.get(refCheckedKey);
 
                     if (referrerId && referrerId !== stringUserId && !isRefChecked) {
-                        // တစ်ကြိမ်သာ ခွင့်ပြုရန် ref_checked ကို true မှတ်မည်
                         await redis.set(refCheckedKey, 'true');
 
                         const referrerKey = `user:${referrerId}:points`;
@@ -66,7 +64,6 @@ module.exports = async (req, res) => {
                             referrerPoints = parseInt(referrerPoints, 10) + 100;
                         }
                         
-                        // ဖိတ်တဲ့သူ့ဆီသို့ +100 PTS တိုက်ရိုက် ပေါင်းထည့်မည်
                         await redis.set(referrerKey, referrerPoints);
                     }
                 }
@@ -83,7 +80,8 @@ module.exports = async (req, res) => {
                 let points = await redis.get(userKey);
                 if (points === null) points = 0;
                 
-                points = parseInt(points, 10) + 10;
+                // ကြော်ငြာတစ်ပုဒ်ကြည့်လျှင် +20 PTS
+                points = parseInt(points, 10) + 20;
                 await redis.set(userKey, points);
                 
                 return res.status(200).json({ 
