@@ -93,7 +93,6 @@
         <p class="text-xs text-slate-400 mt-1">အခြားသူများနဲ့ စကားပြောရန် သို့မဟုတ် အကူအညီရယူရန်</p>
       </div>
       <div class="w-full flex flex-col gap-2">
-        <!-- https://t.me/silent487 လင့်ခ်ဖြင့် အစားထိုးပြီးပါပြီ -->
         <a href="https://t.me/silent487" target="_blank" class="w-full py-3.5 px-4 bg-slate-800 hover:bg-slate-700 active:scale-98 transition-all duration-200 text-white font-bold rounded-2xl text-xs flex items-center justify-center gap-2 border border-slate-700 cursor-pointer">
           <i class="fa-brands fa-telegram text-sky-400 text-base"></i>
           <span>Telegram Community Group သို့ ဝင်ရန်</span>
@@ -136,18 +135,21 @@
 
         document.getElementById('user-greeting').innerHTML = `<i class="fa-solid fa-user text-sky-400"></i> ${user.first_name} <span class="text-slate-500">(ID: ${user.id})</span>`;
         
-        const refLink = `https://t.me/${botUsername}?start=ref_${telegramUserId}`;
+        // Mini App Direct App Link (WebApp /app?startapp=ref_ID) ကို သုံးပေးခြင်းဖြင့် referral ချက်ချင်းဝင်စေမည်
+        const refLink = `https://t.me/${botUsername}/app?startapp=ref_${telegramUserId}`;
         document.getElementById('ref-link-input').value = refLink;
 
-        // LocalStorage ထဲမှာ အရင်သိမ်းထားတာရှိရင် ချက်ချင်းဖော်ပြမည် (ဘော့ထဲကထွက်ပြီး ပြန်ဝင်ရင် ပွိုင့်မပျောက်အောင်)
         const savedPoints = localStorage.getItem(`tg_watch_points_${telegramUserId}`);
         if (savedPoints !== null) {
             userPoints = parseInt(savedPoints, 10);
             updateUI();
         }
 
+        // 🛠️ startPayload ကို Telegram SDK (initDataUnsafe.start_param) အပြင် URL query ထဲက 'startapp' နဲ့ 'start' ပါ သေချာဖမ်းရန်
+        const urlParams = new URLSearchParams(window.location.search);
+        const startPayload = tg.initDataUnsafe?.start_param || urlParams.get('startapp') || urlParams.get('start') || "";
+
         // Server API ဆီသို့ login နှင့် startPayload (ref_ID) ကို ပို့ပေးမည်
-        const startPayload = tg.initDataUnsafe.start_param || "";
         fetch('/api/index', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -164,7 +166,7 @@
         .catch(err => console.log("API sync fallback to local storage"));
     } else {
         document.getElementById('user-greeting').innerHTML = `<i class="fa-solid fa-globe text-amber-400"></i> Web Browser Preview Mode`;
-        document.getElementById('ref-link-input').value = `https://t.me/${botUsername}?start=ref_52504489`;
+        document.getElementById('ref-link-input').value = `https://t.me/${botUsername}/app?startapp=ref_52504489`;
         
         const browserSaved = localStorage.getItem('tg_watch_points_guest');
         if (browserSaved !== null) {
@@ -233,7 +235,7 @@
 
         let adSuccess = false;
         let attempts = 0;
-        const maxAttempts = 2; // Network error တွေအတွက် နှစ်ကြိမ်အထိ ထပ်မံကြိုးစားပေးမည့် စနစ်
+        const maxAttempts = 2;
 
         while (attempts < maxAttempts && !adSuccess) {
             attempts++;
@@ -252,7 +254,7 @@
 
         if (adSuccess) {
             userPoints += 10;
-            saveUserPoints(); // ထွက်ပြီးပြန်ဝင်ရင်မပျောက်အောင် ဖုန်းထဲမှာ instant သိမ်းမယ်
+            saveUserPoints();
             updateUI();
 
             if(telegramUserId) {
