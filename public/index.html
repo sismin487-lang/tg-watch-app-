@@ -37,7 +37,7 @@
         <span id="points">0</span> <span class="text-2xl font-bold text-sky-400">PTS</span>
       </div>
       <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-xs text-emerald-400 font-semibold">
-        <i class="fa-solid fa-wallet"></i>  $<span id="usd-balance">0.0000</span> USD
+        <i class="fa-solid fa-wallet"></i> $<span id="usd-balance">0.0000</span> USD
       </div>
       <div class="w-full bg-slate-950/60 rounded-xl p-3 border border-slate-800/50 mt-2 text-left">
         <div class="flex justify-between text-[11px] text-slate-400 font-medium mb-1.5">
@@ -194,6 +194,13 @@
         }
         updateUI();
     }
+
+    // Bot ထဲကနေ ထွက်သွားချိန် သို့မဟုတ် App ပိတ်ချိန်တွင် Wallet ပါ အလိုအလျောက် ဖြုတ်ရန်
+    window.addEventListener('beforeunload', () => {
+        if (tonConnectUI && tonConnectUI.connected) {
+            tonConnectUI.disconnect().catch(e => console.log("Disconnect error on exit"));
+        }
+    });
 
     function saveUserPoints() {
         if (telegramUserId) {
