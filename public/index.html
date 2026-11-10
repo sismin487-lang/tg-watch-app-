@@ -134,7 +134,7 @@
         buttonRootId: 'ton-connect'
     });
 
-    // User Identification & Wallet Session Isolation (Only clears when switching to a different user)
+    // User Identification & Wallet Session Isolation
     if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
         const user = tg.initDataUnsafe.user;
         telegramUserId = user.id;
@@ -144,9 +144,12 @@
         const refLink = `https://t.me/${botUsername}/app?startapp=ref_${telegramUserId}`;
         document.getElementById('ref-link-input').value = refLink;
 
-        // Check if a DIFFERENT user is logging in on the same device
+        // Check if a DIFFERENT user is logging in on the same device -> Force Disconnect Wallet
         const lastActiveUser = localStorage.getItem('last_telegram_user_id');
         if (lastActiveUser && lastActiveUser !== telegramUserId.toString()) {
+            if (tonConnectUI && tonConnectUI.connected) {
+                tonConnectUI.disconnect().catch(err => console.log("Disconnect error:", err));
+            }
             const keysToRemove = [];
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
