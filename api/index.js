@@ -80,8 +80,8 @@ module.exports = async (req, res) => {
                 let points = await redis.get(userKey);
                 if (points === null) points = 0;
                 
-                // ကြော်ငြာတစ်ပုဒ်ကြည့်လျှင် +20 PTS
-                points = parseInt(points, 10) + 20;
+                // ကြော်ငြာတစ်ပုဒ်ကြည့်လျှင် +15 PTS သို့ ပြောင်းထားသည်
+                points = parseInt(points, 10) + 15;
                 await redis.set(userKey, points);
                 
                 return res.status(200).json({ 
