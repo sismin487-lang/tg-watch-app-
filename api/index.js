@@ -1,58 +1,13 @@
 import { Telegraf } from 'telegraf';
 import { Redis } from '@upstash/redis';
 
-const token = "9296311020:AAGKeEJQv2jdjOzRlON5bV8o3OY3c-iR1hk";
-if (!token) {
-    console.error("BOT_TOKEN is not defined!");
-}
-
+const token = process.env.TELEGRAM_BOT_TOKEN || "9296311020:AAGKeEJQv2jdjOzRlON5bV8o3OY3c-iR1hk";
 const bot = new Telegraf(token);
 
-// Upstash Redis Database တိုက်ရိုက်ချိတ်ဆက်ခြင်း
+// Upstash Redis Database ချိတ်ဆက်ခြင်း
 const redis = new Redis({
   url: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL,
   token: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
-});
-
-// Bot /start command with permanent Redis referral handling
-bot.start(async (ctx) => {
-    const userName = ctx.from.first_name || 'User';
-    const startPayload = ctx.payload;
-    const currentUserId = ctx.from.id.toString();
-
-    const userKey = `user:${currentUserId}:points`;
-    const refCheckedKey = `user:${currentUserId}:ref_checked`;
-
-    // User အသစ်ဖြစ်ပါက ပွိုင့် 0 စတင်မည်
-    let points = await redis.get(userKey);
-    if (points === null) {
-        await redis.set(userKey, 0);
-    }
-
-    // Referral စစ်ဆေးခြင်း (တစ်ခါပဲ ခွင့်ပြုမည်၊ Database ထဲမှာ အမြဲမှတ်မည်)
-    if (startPayload && startPayload.startsWith('ref_')) {
-        const referrerId = startPayload.replace('ref_', '');
-        const isRefChecked = await redis.get(refCheckedKey);
-
-        if (referrerId !== currentUserId && !isRefChecked) {
-            await redis.set(refCheckedKey, 'true');
-
-            const referrerKey = `user:${referrerId}:points`;
-            let referrerPoints = await redis.get(referrerKey) || 0;
-            referrerPoints = parseInt(referrerPoints, 10) + 100;
-            
-            // ဖိတ်တဲ့သူ့ကို 100 PTS အမြဲတမ်း ပေါင်းပေးမည်
-            await redis.set(referrerKey, referrerPoints);
-        }
-    }
-
-    await ctx.reply(`မင်္ဂလာပါ ${userName}! Tg Watch & Earn Mini App မှ ကြိုဆိုပါတယ်။ ဗီဒီယိုကြည့်ပြီး ပွိုင့်များ စုဆောင်းနိုင်ပါပြီ။`, {
-        reply_markup: {
-            inline_keyboard: [
-                [{ text: " Open Mini App", web_app: { url: "https://tg-watch-app.vercel.app" } }]
-            ]
-        }
-    });
 });
 
 module.exports = async (req, res) => {
@@ -64,51 +19,78 @@ module.exports = async (req, res) => {
     if (req.method === 'OPTIONS') return res.status(200).end();
 
     try {
+        const body = req.body || {};
+        
+        // Telegram Webhook Update Handle (စာပြန်ခြင်းမရှိ၊ ငြိမ်သက်စွာနေမည်)
+        if (body.update_id) {
+            // လိုအပ်ပါက Telegraf update handle ကို ဒီမှာ သုံးနိုင်သည် (သို့သော် referral ကို Mini App login မှ အသေအချာကိုင်တွယ်သည်)
+            try {
+                await bot.handleUpdate(body);
+            } catch (e) {
+                console.error("Bot update error:", e);
+            }
+            return res.status(200).json({ status: 'ok' });
+        }
+
         if (req.method === 'POST') {
-            const body = req.body || {};
             const { action, userId, startPayload } = body;
             
             if (!userId) {
                 return res.status(400).json({ success: false, error: "Missing userId" });
             }
+            
             const stringUserId = userId.toString();
             const userKey = `user:${stringUserId}:points`;
             const refCheckedKey = `user:${stringUserId}:ref_checked`;
 
-            // 1. Login / Get Points
+            // 1. Login / Get Points & Referral Processing
             if (action === 'login' || action === 'get_points') {
                 let points = await redis.get(userKey);
 
+                // User အသစ်ဖြစ်လျှင် ပွိုင့် 0 စတင်မည်
                 if (points === null) {
                     points = 0;
                     await redis.set(userKey, points);
+                }
 
-                    // Mini App မှတဆင့် ဝင်လာချိန် startPayload ပါလာပါက Database တွင် Referral စစ်မည်
-                    if (action === 'login' && startPayload && startPayload.startsWith('ref_')) {
-                        const referrerId = startPayload.replace('ref_', '');
-                        const isRefChecked = await redis.get(refCheckedKey);
+                // Referral စစ်ဆေးခြင်း (Mini App ဝင်လာချိန် startPayload ပါလာပါက)
+                if (startPayload && startPayload.startsWith('ref_')) {
+                    const referrerId = startPayload.replace('ref_', '');
+                    const isRefChecked = await redis.get(refCheckedKey);
 
-                        if (referrerId !== stringUserId && !isRefChecked) {
-                            await redis.set(refCheckedKey, 'true');
+                    // မိမိကိုယ်ကို ပြန်မဖိတ်ရပါ၊ နှင့် ဒီလူသည် တစ်ခါမှ referral ဆုမရသေးမှသာ
+                    if (referrerId !== stringUserId && !isRefChecked) {
+                        // ဤ user သည် referral ယူပြီးပြီဟု အမြဲတမ်း မှတ်ထားမည်
+                        await redis.set(refCheckedKey, 'true');
 
-                            const referrerKey = `user:${referrerId}:points`;
-                            let referrerPoints = await redis.get(referrerKey) || 0;
+                        const referrerKey = `user:${referrerId}:points`;
+                        let referrerPoints = await redis.get(referrerKey);
+                        
+                        if (referrerPoints === null) {
+                            referrerPoints = 100;
+                        } else {
                             referrerPoints = parseInt(referrerPoints, 10) + 100;
-                            
-                            await redis.set(referrerKey, referrerPoints);
                         }
+                        
+                        // ဖိတ်တဲ့သူ့ကို +100 PTS တိုက်ရိုက် ပေါင်းပေးမည်
+                        await redis.set(referrerKey, referrerPoints);
                     }
                 }
 
+                // လက်ရှိ user ရဲ့ ပွိုင့်အမှန်ကို ပြန်ထုတ်ပေးမည်
+                const finalPoints = await redis.get(userKey);
+
                 return res.status(200).json({ 
                     success: true, 
-                    points: parseInt(points, 10) 
+                    points: parseInt(finalPoints || 0, 10) 
                 });
             }
 
             // 2. Watched Ad (+10 PTS)
             if (action === 'watched_ad') {
-                let points = await redis.get(userKey) || 0;
+                let points = await redis.get(userKey);
+                if (points === null) points = 0;
+                
                 points = parseInt(points, 10) + 10;
                 await redis.set(userKey, points);
                 
@@ -117,16 +99,10 @@ module.exports = async (req, res) => {
                     points: parseInt(points, 10) 
                 });
             }
-
-            // Telegram Webhook Update
-            if (body.update_id) {
-                await bot.handleUpdate(body);
-                return res.status(200).json({ status: 'ok' });
-            }
         }
 
         if (req.method === 'GET') {
-            return res.status(200).send('Telegram Bot Server with Permanent Redis DB is running successfully!');
+            return res.status(200).send('Telegram Bot Server is running successfully!');
         }
 
         return res.status(200).json({ status: 'received' });
