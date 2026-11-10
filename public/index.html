@@ -197,7 +197,7 @@
         document.getElementById('usd-balance').innerText = (userPoints * POINT_RATE).toFixed(4);
         
         const progressPercent = Math.min(100, (userPoints / MIN_WITHDRAWAL) * 100);
-        document.getElementById('progress-bar').style.width = `${progressPercent}%`;
+        document.getElementById('progress-bar').style.width = `${progressPercent}`;
         document.getElementById('progress-text').innerText = `${userPoints.toLocaleString()} / ${MIN_WITHDRAWAL.toLocaleString()} PTS`;
 
         const withdrawBtn = document.getElementById('withdraw-btn');
@@ -215,7 +215,17 @@
         buttonRootId: 'ton-connect'
     });
 
+    // 🛠️ ဤနေရာတွင် Wallet ချိတ်ဆက်မှုကို Telegram ID အလိုက် သီးသန့်ဖြစ်အောင် ထည့်သွင်းထားပါသည်
     tonConnectUI.onStatusChange(wallet => {
+        if (wallet) {
+            if (telegramUserId) {
+                localStorage.setItem(`connected_wallet_${telegramUserId}`, JSON.stringify(wallet));
+            }
+        } else {
+            if (telegramUserId) {
+                localStorage.removeItem(`connected_wallet_${telegramUserId}`);
+            }
+        }
         updateUI();
     });
 
