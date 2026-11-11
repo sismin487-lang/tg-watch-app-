@@ -2,7 +2,6 @@ import { Telegraf } from 'telegraf';
 import { Redis } from '@upstash/redis';
 import crypto from 'crypto';
 
-// Token only from Vercel Env, never hardcoded
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const bot = new Telegraf(token);
 
@@ -11,41 +10,35 @@ const redis = new Redis({
   token: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-// Ad text
-const AD_TEXT = ` MyanMyanPay - ကြော်ငြာကြည့်ပြီး ပိုက်ဆံရှာပါ!
+const AD_TEXT = `🔥 Watch & Earn - ကြော်ငြာကြည့်ပြီး ပိုက်ဆံရှာပါ!
 
- ကြော်ငြာ 1 ခု ကြည့်တိုင်း = +15 Points
- သူငယ်ချင်းခေါ်တိုင်း = +100 Points
- 1500 Points ပြည့်တာနဲ့ ထုတ်လို့ရပြီ!
+ကြော်ငြာ 1 ခု ကြည့်တိုင်း = +15 Points
+သူငယ်ချင်းခေါ်တိုင်း = +100 Points
+1500 Points ပြည့်တာနဲ့ ထုတ်လို့ရပြီ!
 
- TON / KPay / WavePay နဲ့ ထုတ်လို့ရတယ်
- အလကား - ဘာမှပေးစရာမလိုဘူး
- နေ့တိုင်း ကြော်ငြာကြည့်ပြီး ရှာလို့ရတယ်
+TON / KPay / WavePay နဲ့ ထုတ်လို့ရတယ်
+အလကား - ဘာမှပေးစရာမလိုဘူး
+နေ့တိုင်း ကြော်ငြာကြည့်ပြီး ရှာလို့ရတယ်
 
- အခုပဲ စလိုက်ပါ!`;
+အခုပဲ စလိုက်ပါ!`;
 
 const START_TEXT = AD_TEXT + `
 
- စဖို့ အောက်က Button ကိုနှိပ်ပါ `;
+စဖို့ အောက်က Button ကိုနှိပ်ပါ`;
 
-// Bot /start handler
 bot.start(async (ctx) => {
   try {
-    const webappUrl = process.env.WEBAPP_URL;
-    const keyboard = webappUrl
-      ? [[{ text: ' App ဖွင့်မယ်', web_app: { url: webappUrl } }]]
-      : [[{ text: ' App ဖွင့်မယ်', url: 'https://t.me/myanmyanpay_sithu_bot' }]];
+    const webappUrl = process.env.WEBAPP_URL || 'https://tg-watch-app.vercel.app';
+    const keyboard = [[{ text: ' App ဖွင့်မယ်', web_app: { url: webappUrl } }]];
     await ctx.reply(START_TEXT, { reply_markup: { inline_keyboard: keyboard } });
   } catch (e) {
-    console.error('start error:', e);
-    try { await ctx.reply(START_TEXT); } catch (e2) { console.error('start fallback error:', e2); }
+    try { await ctx.reply(START_TEXT); } catch (e2) {}
   }
 });
 
-// Reply ad text to any non-command text
 bot.on('text', async (ctx) => {
   if (ctx.message.text.startsWith('/')) return;
-  try { await ctx.reply(AD_TEXT); } catch (e) { console.error('text error:', e); }
+  try { await ctx.reply(AD_TEXT); } catch (e) {}
 });
 
 bot.command('ad', async (ctx) => {
@@ -56,7 +49,6 @@ bot.help(async (ctx) => {
   await ctx.reply(AD_TEXT);
 });
 
-// Verify Telegram initData
 function verifyTelegram(initData) {
   if (!initData || !token) return null;
   try {
@@ -76,85 +68,51 @@ export default async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
     if (req.method === 'OPTIONS') return res.status(200).end();
-
     try {
         let body = req.body || {};
         if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
-        
         if (body.update_id) {
-            try {
-                await bot.handleUpdate(body);
-            } catch (e) {
-                console.error("Bot update error:", e);
-            }
+            try { await bot.handleUpdate(body); } catch (e) {}
             return res.status(200).json({ status: 'ok' });
         }
-
         if (req.method === 'POST') {
             const { action, userId, startPayload, initData, walletAddress } = body;
-
             if (action === 'get_ad_text') {
                 return res.status(200).json({ success: true, adText: AD_TEXT });
             }
-            
             if (!userId) {
                 return res.status(400).json({ success: false, error: "Missing userId" });
             }
-            
             const stringUserId = userId.toString();
             const userKey = `user:${stringUserId}:points`;
             const refCheckedKey = `user:${stringUserId}:ref_checked`;
-
             if (initData) {
                 const tgUser = verifyTelegram(initData);
                 if (!tgUser || String(tgUser.id) !== stringUserId) {
                     return res.status(403).json({ success: false, error: "Invalid Telegram data" });
                 }
             }
-
             if (action === 'login' || action === 'get_points') {
                 let points = await redis.get(userKey);
-
-                if (points === null) {
-                    points = 0;
-                    await redis.set(userKey, points);
-                }
-
-                // Referral +100 PTS
+                if (points === null) { points = 0; await redis.set(userKey, points); }
                 if (action === 'login' && startPayload) {
                     const referrerId = startPayload.toString().replace('ref_', '').trim();
                     const isRefChecked = await redis.get(refCheckedKey);
-
                     if (referrerId && referrerId !== stringUserId && !isRefChecked) {
                         await redis.set(refCheckedKey, 'true');
-
                         const referrerKey = `user:${referrerId}:points`;
                         let referrerPoints = await redis.get(referrerKey);
-                        
-                        if (referrerPoints === null) {
-                            referrerPoints = 100;
-                        } else {
-                            referrerPoints = parseInt(referrerPoints, 10) + 100;
-                        }
-                        
+                        if (referrerPoints === null) { referrerPoints = 100; }
+                        else { referrerPoints = parseInt(referrerPoints, 10) + 100; }
                         await redis.set(referrerKey, referrerPoints);
                     }
                 }
-
                 const finalPoints = await redis.get(userKey);
                 const pending = await redis.get(`user:${stringUserId}:pending_withdraw`);
-
-                return res.status(200).json({ 
-                    success: true, 
-                    points: parseInt(finalPoints || 0, 10),
-                    pendingWithdraw: pending ? parseInt(pending, 10) : 0
-                });
+                return res.status(200).json({ success: true, points: parseInt(finalPoints || 0, 10), pendingWithdraw: pending ? parseInt(pending, 10) : 0 });
             }
-
             if (action === 'watched_ad') {
-                // 10 seconds throttle to prevent spam
                 const lastAdKey = `user:${stringUserId}:last_ad`;
                 const lastAd = await redis.get(lastAdKey);
                 const now = Date.now();
@@ -163,20 +121,12 @@ export default async (req, res) => {
                     return res.status(200).json({ success: true, points: parseInt(cur || 0, 10) });
                 }
                 await redis.set(lastAdKey, now);
-
                 let points = await redis.get(userKey);
                 if (points === null) points = 0;
-                
-                // +15 PTS for watching one ad
                 points = parseInt(points, 10) + 15;
                 await redis.set(userKey, points);
-                
-                return res.status(200).json({ 
-                    success: true, 
-                    points: parseInt(points, 10) 
-                });
+                return res.status(200).json({ success: true, points: parseInt(points, 10) });
             }
-
             if (action === 'vpn_bonus') {
                 const today = new Date().toISOString().slice(0, 10);
                 const vpnKey = `user:${stringUserId}:vpn_bonus:${today}`;
@@ -190,72 +140,37 @@ export default async (req, res) => {
                 const points = await redis.incrby(userKey, 5);
                 return res.status(200).json({ success: true, points: parseInt(points, 10), limitReached: false });
             }
-
             if (action === 'request_withdraw') {
                 let points = await redis.get(userKey);
                 points = parseInt(points || 0, 10);
-
-                if (points < 1500) {
-                    return res.status(200).json({ success: false, error: "Points မလုံလောက်ပါ" });
-                }
-                if (!walletAddress) {
-                    return res.status(200).json({ success: false, error: "Wallet လိပ်စာ မပါပါ" });
-                }
-
-                // payMethod: TON / KPay / WavePay
+                if (points < 1500) { return res.status(200).json({ success: false, error: "Points မလုံလောက်ပါ" }); }
+                if (!walletAddress) { return res.status(200).json({ success: false, error: "Wallet လိပ်စာ မပါပါ" }); }
                 const payMethod = body.payMethod || "TON";
-                if (!["TON", "KPay", "WavePay"].includes(payMethod)) {
-                    return res.status(200).json({ success: false, error: "Payment Method မမှန်ပါ" });
-                }
-
+                if (!["TON", "KPay", "WavePay"].includes(payMethod)) { return res.status(200).json({ success: false, error: "Payment Method မမှန်ပါ" }); }
                 await redis.set(userKey, 0);
                 await redis.set(`user:${stringUserId}:pending_withdraw`, points);
-
                 const withdrawId = `${Date.now()}_${stringUserId}`;
-                await redis.set(`withdraw:${withdrawId}`, JSON.stringify({
-                    userId: stringUserId,
-                    walletAddress: walletAddress,
-                    payMethod: payMethod,
-                    points: points,
-                    status: 'pending',
-                    createdAt: new Date().toISOString()
-                }));
-
-                // Notify Admin on withdraw
+                await redis.set(`withdraw:${withdrawId}`, JSON.stringify({ userId: stringUserId, walletAddress: walletAddress, payMethod: payMethod, points: points, status: 'pending', createdAt: new Date().toISOString() }));
                 try {
                     const adminId = process.env.ADMIN_ID;
                     if (adminId) {
-                        await bot.telegram.sendMessage(adminId,
-                            ` Withdraw အသစ်!\n\n` +
-                            `User ID: ${stringUserId}\n` +
-                            `Method: ${payMethod}\n` +
-                            `Account: ${walletAddress}\n` +
-                            `Points: ${points} PTS`
-                        );
+                        await bot.telegram.sendMessage(adminId, ` Withdraw အသစ်!\n\nUser ID: ${stringUserId}\nMethod: ${payMethod}\nAccount: ${walletAddress}\nPoints: ${points} PTS`);
                     }
-                } catch (e) { console.log("Admin notify failed", e); }
-
+                } catch (e) {}
                 return res.status(200).json({ success: true, points: 0 });
             }
         }
-
         if (req.method === 'GET') {
             if (req.query && req.query.setup === '1') {
                 const host = req.headers.host;
                 const webhookUrl = `https://${host}/api/index`;
-                try {
-                    await bot.telegram.setWebhook(webhookUrl);
-                    return res.status(200).send('Webhook OK: ' + webhookUrl);
-                } catch (e) {
-                    return res.status(500).send('Webhook FAILED: ' + e.message);
-                }
+                try { await bot.telegram.setWebhook(webhookUrl); return res.status(200).send('Webhook OK: ' + webhookUrl); }
+                catch (e) { return res.status(500).send('Webhook FAILED: ' + e.message); }
             }
             return res.status(200).send('Telegram Bot Server is running successfully!');
         }
-
         return res.status(200).json({ status: 'received' });
     } catch (error) {
-        console.error("Error handling request:", error);
         return res.status(500).json({ error: error.message });
     }
 };
