@@ -12,36 +12,43 @@ const redis = new Redis({
 });
 
 // ===== ခုနက ကြော်ငြာစာသား - ဒီထဲမှာ ထည့်ထားပြီ =====
-const AD_TEXT = `💰 MyanMyanPay - ကြော်ငြာကြည့်ပြီး ပိုက်ဆံရှာပါ!
+const AD_TEXT = ` MyanMyanPay - ကြော်ငြာကြည့်ပြီး ပိုက်ဆံရှာပါ!
 
-📺 ကြော်ငြာ 1 ခု ကြည့်တိုင်း = +15 Points
-🎁 သူငယ်ချင်းခေါ်တိုင်း = +100 Points
-💸 1500 Points ပြည့်တာနဲ့ ထုတ်လို့ရပြီ!
+ ကြော်ငြာ 1 ခု ကြည့်တိုင်း = +15 Points
+ သူငယ်ချင်းခေါ်တိုင်း = +100 Points
+ 1500 Points ပြည့်တာနဲ့ ထုတ်လို့ရပြီ!
 
-✅ TON / KPay / WavePay နဲ့ ထုတ်လို့ရတယ်
-✅ အလကား - ဘာမှပေးစရာမလိုဘူး
-✅ နေ့တိုင်း ကြော်ငြာကြည့်ပြီး ရှာလို့ရတယ်
+ TON / KPay / WavePay နဲ့ ထုတ်လို့ရတယ်
+ အလကား - ဘာမှပေးစရာမလိုဘူး
+ နေ့တိုင်း ကြော်ငြာကြည့်ပြီး ရှာလို့ရတယ်
 
-👇 အခုပဲ စလိုက်ပါ!`;
+ အခုပဲ စလိုက်ပါ!`;
 
 const START_TEXT = AD_TEXT + `
 
-🚀 စဖို့ အောက်က Button ကိုနှိပ်ပါ 👇`;
+ စဖို့ အောက်က Button ကိုနှိပ်ပါ `;
 
 // Bot /start နှိပ်ရင် ကြော်ငြာစာသား ပို့မယ်
+// FIXED - အရင် web_app url မှာ t.me ပေးထားလို့ Telegram က reply ကို ပယ်ချပြီး စာမဝင်တာ
+// WEBAPP_URL မရှိရင် url button သုံးမယ်, ရှိရင်မှ web_app သုံးမယ်
 bot.start(async (ctx) => {
   try {
-    const startPayload = ctx.startPayload || '';
-    await ctx.reply(START_TEXT, {
-      reply_markup: {
-        inline_keyboard: [[
-          { text: '🚀 App ဖွင့်မယ်', web_app: { url: process.env.WEBAPP_URL || 'https://t.me/myanmyanpay_sithu_bot' } }
-        ],[
-          { text: '👥 သူငယ်ချင်းခေါ်မယ် (+100)', switch_inline_query: `ref_${ctx.from.id}` }
-        ]]
-      }
-    });
-  } catch (e) { console.error('start error:', e); }
+    const webappUrl = process.env.WEBAPP_URL;
+    const keyboard = webappUrl
+      ? [[{ text: ' App ဖွင့်မယ်', web_app: { url: webappUrl } }]]
+      : [[{ text: ' App ဖွင့်မယ်', url: 'https://t.me/myanmyanpay_sithu_bot' }]];
+    await ctx.reply(START_TEXT, { reply_markup: { inline_keyboard: keyboard } });
+  } catch (e) {
+    console.error('start error:', e);
+    // Button ကြောင့် fail ရင် စာသက်သက်ပဲ ပြန်ပို့မယ် - စာလုံးဝ မဝင်တာမျိုး မဖြစ်တော့ဘူး
+    try { await ctx.reply(START_TEXT); } catch (e2) { console.error('start fallback error:', e2); }
+  }
+});
+
+// FIXED - /start မဟုတ်တဲ့ စာမှန်သမျှကိုလည်း ကြော်ငြာစာသား ပြန်ပို့မယ်, စမ်းလို့ရအောင်
+bot.on('text', async (ctx) => {
+  if (ctx.message.text.startsWith('/')) return;
+  try { await ctx.reply(AD_TEXT); } catch (e) { console.error('text error:', e); }
 });
 
 // /ad လို့ ရိုက်ရင် ကြော်ငြာစာသား ပြန်ပို့မယ်
@@ -227,6 +234,17 @@ export default async (req, res) => {
         }
 
         if (req.method === 'GET') {
+            // Browser မှာ https://<vercel-domain>/api/index?setup=1 လို့ ဖွင့်ရင် Webhook အလိုလို ချိတ်ပေးမယ်
+            if (req.query && req.query.setup === '1') {
+                const host = req.headers.host;
+                const webhookUrl = `https://${host}/api/index`;
+                try {
+                    await bot.telegram.setWebhook(webhookUrl);
+                    return res.status(200).send('Webhook OK: ' + webhookUrl);
+                } catch (e) {
+                    return res.status(500).send('Webhook FAILED: ' + e.message);
+                }
+            }
             return res.status(200).send('Telegram Bot Server is running successfully!');
         }
 
