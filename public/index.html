@@ -6,12 +6,10 @@
   <title>Tg Watch & Earn</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <!-- Adsgram SDK (VPN tolerant setup) -->
   <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
   <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    /* FIXED - Payment method with logos */
     .pay-grid{display:flex;gap:10px;width:100%}
     .pay-opt{flex:1;background:#020617;border:2px solid #1e293b;border-radius:16px;padding:10px 6px;cursor:pointer;text-align:center;transition:all .2s}
     .pay-opt.active{border-color:#22c55e;background:#14532d}
@@ -22,7 +20,6 @@
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-between p-4 selection:bg-sky-500 selection:text-white">
 
   <div class="w-full max-w-md flex flex-col gap-5 my-auto">
-    <!-- User Greeting & TonConnect -->
     <div class="bg-slate-900/85 backdrop-blur-md border border-slate-800 rounded-3xl p-5 shadow-2xl flex flex-col items-center gap-3">
       <div class="flex items-center gap-2">
         <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-sky-400 to-blue-600 flex items-center justify-center text-white shadow-md">
@@ -36,7 +33,6 @@
       <div id="ton-connect" class="mt-1 flex justify-center"></div>
     </div>
 
-    <!-- Points & Balance -->
     <div class="relative overflow-hidden bg-gradient-to-b from-slate-900 to-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center gap-2">
       <span class="text-xs uppercase tracking-widest text-slate-400 font-bold flex items-center gap-1.5">
         <i class="fa-solid fa-coins text-amber-400"></i> သင့်လက်ကျန်အမှတ်
@@ -58,7 +54,6 @@
       </div>
     </div>
 
-    <!-- Watch Ads Section -->
     <div class="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-3xl p-5 shadow-2xl flex flex-col items-center text-center gap-3">
       <div class="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 text-xl shadow-inner">
         <i class="fa-solid fa-film"></i>
@@ -73,7 +68,6 @@
       </button>
     </div>
 
-    <!-- Friend Invite Section -->
     <div class="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-3xl p-5 shadow-2xl flex flex-col items-center text-center gap-3">
       <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-xl shadow-inner">
         <i class="fa-solid fa-users"></i>
@@ -91,7 +85,6 @@
       </div>
     </div>
 
-    <!-- Community & Support Section -->
     <div class="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-3xl p-5 shadow-2xl flex flex-col items-center text-center gap-3">
       <div class="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-xl shadow-inner">
         <i class="fa-solid fa-comments"></i>
@@ -108,14 +101,11 @@
       </div>
     </div>
 
-    <!-- Withdraw Section -->
     <div class="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-3xl p-5 shadow-2xl flex flex-col items-center text-center gap-3">
       <div class="flex items-center justify-between w-full text-xs text-slate-400 px-1">
         <span class="flex items-center gap-1"><i class="fa-solid fa-shield-halved text-emerald-400"></i> <span id="withdraw-label">TON Payout</span></span>
         <span>Min: 1,500 PTS</span>
       </div>
-
-      <!-- FIXED - Official Logos with direct URL, no upload needed -->
       <div class="pay-grid">
         <div class="pay-opt active" id="opt-TON" onclick="selectPay('TON')">
           <img src="https://zengo.com/wp-content/uploads/Toncoin.png" alt="TON Logo"><div>TON</div>
@@ -127,5 +117,304 @@
           <img src="https://play-lh.googleusercontent.com/uxB0rAW_ij7_WrhnBp2HGjE9h0sX10ZPTi9CNyxKMfUoiSzNO2vjwubGShVRWozYfGuJc_4g5ZN5weYOeUiSQOM=s0-br30" alt="WavePay Logo"><div>WavePay</div>
         </div>
       </div>
+      <input type="text" id="walletInput" placeholder="TON Wallet လိပ်စာ (TonConnect က အလိုလို ဖြည့်ပေးမယ်)" class="w-full bg-slate-950/60 border border-slate-800 rounded-2xl px-3 py-2.5 text-xs text-slate-300 focus:outline-none">
+      <div id="payHint" class="text-[11px] text-slate-400">TON ရွေးထားရင် အပေါ်က TonConnect နဲ့ ချိတ်ပါ</div>
+      <button id="withdraw-btn" onclick="withdrawFunds()" disabled class="w-full py-3.5 px-4 bg-slate-800 text-slate-500 font-bold rounded-2xl cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 border border-slate-800">
+        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+        <span>ငွေထုတ်ယူမည် (Withdraw)</span>
+      </button>
+    </div>
+  </div>
 
-      <!-- FIX
+  <div class="text-center text-[10px] text-slate-600 mt-4 font-mono">
+    Tg Watch Mini App v1.0  Powered by Adsgram & TON
+  </div>
+
+  <script>
+    // CHECKED - Safe Telegram init, if Telegram missing, buttons still work
+    const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : {
+      ready: function(){}, expand: function(){},
+      showAlert: function(m){ alert(m); },
+      initDataUnsafe: {}
+    };
+    try { tg.ready(); } catch(e){}
+    try { tg.expand(); } catch(e){}
+
+    const POINT_RATE = 0.0001; 
+    const MIN_WITHDRAWAL = 1500;
+    let telegramUserId = null;
+    let userPoints = 0;
+    let payMethod = "TON";
+    const botUsername = "Adsgram12_bot"; 
+
+    // CHECKED - TonConnect failsafe with typeof check
+    let tonConnectUI = null;
+    try {
+        if (typeof TON_CONNECT_UI !== 'undefined' && TON_CONNECT_UI && TON_CONNECT_UI.TonConnectUI) {
+            tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+                manifestUrl: 'https://tg-watch-app.vercel.app/tonconnect-manifest.json',
+                buttonRootId: 'ton-connect'
+            });
+        } else { throw new Error("TON_CONNECT_UI not loaded"); }
+    } catch (e) {
+        console.log("TonConnect load failed, buttons still work", e);
+        tonConnectUI = {
+            connected: false,
+            account: null,
+            disconnect: async () => {},
+            onStatusChange: () => {}
+        };
+    }
+
+    // CHECKED - Always set invite link first, even if Telegram fails
+    function setDefaultRefLink() {
+        var el = document.getElementById('ref-link-input');
+        if (el && el.value === "Loading invite link...") {
+            el.value = "https://t.me/" + botUsername + "/app?startapp=ref_52504489";
+        }
+    }
+    setDefaultRefLink();
+
+    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+        const user = tg.initDataUnsafe.user;
+        telegramUserId = user.id;
+        document.getElementById('user-greeting').innerHTML = `<i class="fa-solid fa-user text-sky-400"></i> ${user.first_name} <span class="text-slate-500">(ID: ${user.id})</span>`;
+        const refLink = `https://t.me/${botUsername}/app?startapp=ref_${telegramUserId}`;
+        document.getElementById('ref-link-input').value = refLink;
+
+        const lastActiveUser = localStorage.getItem('last_telegram_user_id');
+        if (lastActiveUser && lastActiveUser !== telegramUserId.toString()) {
+            if (tonConnectUI && tonConnectUI.connected) {
+                try { tonConnectUI.disconnect().catch(()=>{}); } catch(e){}
+            }
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (key.includes('ton-connect') || key.includes('tc-') || key.includes('tonconnect'))) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(k => localStorage.removeItem(k));
+        }
+        localStorage.setItem('last_telegram_user_id', telegramUserId.toString());
+
+        const savedPoints = localStorage.getItem(`tg_watch_points_${telegramUserId}`);
+        if (savedPoints !== null) {
+            userPoints = parseInt(savedPoints, 10);
+            updateUI();
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const startPayload = tg.initDataUnsafe?.start_param || urlParams.get('startapp') || urlParams.get('start') || "";
+
+        fetch('/api/index', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'login', userId: telegramUserId, startPayload: startPayload })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success && typeof data.points === 'number') {
+                userPoints = Math.max(userPoints, data.points);
+                saveUserPoints();
+                updateUI();
+            }
+        })
+        .catch(err => console.log("API sync fallback to local storage"));
+    } else {
+        document.getElementById('user-greeting').innerHTML = `<i class="fa-solid fa-globe text-amber-400"></i> Web Browser Preview Mode`;
+        document.getElementById('ref-link-input').value = `https://t.me/${botUsername}/app?startapp=ref_52504489`;
+        const browserSaved = localStorage.getItem('tg_watch_points_guest');
+        if (browserSaved !== null) {
+            userPoints = parseInt(browserSaved, 10);
+        }
+        updateUI();
+    }
+
+    function saveUserPoints() {
+        if (telegramUserId) {
+            localStorage.setItem(`tg_watch_points_${telegramUserId}`, userPoints);
+        } else {
+            localStorage.setItem('tg_watch_points_guest', userPoints);
+        }
+    }
+
+    function copyRefLink() {
+        const inputElement = document.getElementById('ref-link-input');
+        inputElement.select();
+        try { navigator.clipboard.writeText(inputElement.value); } catch(e){}
+        if (tg && tg.showAlert) {
+            tg.showAlert("ဖိတ်ကြားရေးလင့်ခ်ကို ကူးယူပြီးပါပြီ! သူငယ်ချင်းများထံ ပို့ပေးပါ။");
+        } else {
+            alert("Invite link copied to clipboard!");
+        }
+    }
+
+    function selectPay(method) {
+        payMethod = method;
+        document.querySelectorAll('.pay-opt').forEach(el => el.classList.remove('active'));
+        document.getElementById('opt-' + method).classList.add('active');
+        const input = document.getElementById('walletInput');
+        const hint = document.getElementById('payHint');
+        const label = document.getElementById('withdraw-label');
+        if (method === 'TON') {
+            label.innerText = "TON Payout";
+            input.placeholder = "TON Wallet လိပ်စာ (TonConnect က အလိုလို ဖြည့်ပေးမယ်)";
+            hint.innerText = "TON ရွေးထားရင် အပေါ်က TonConnect နဲ့ ချိတ်ပါ";
+            if (tonConnectUI && tonConnectUI.account && tonConnectUI.account.address) input.value = tonConnectUI.account.address;
+        } else if (method === 'KPay') {
+            label.innerText = "KPay Payout";
+            input.placeholder = "KPay ဖုန်းနံပါတ် ထည့်ပါ (09...)";
+            hint.innerText = "KPay ဖုန်းနံပါတ် ထည့်ပါ, Admin က လွှဲပေးမယ်";
+            input.value = "";
+        } else if (method === 'WavePay') {
+            label.innerText = "WavePay Payout";
+            input.placeholder = "WavePay ဖုန်းနံပါတ် ထည့်ပါ (09...)";
+            hint.innerText = "WavePay ဖုန်းနံပါတ် ထည့်ပါ, Admin က လွှဲပေးမယ်";
+            input.value = "";
+        }
+        updateUI();
+    }
+
+    function updateUI() {
+        var ptsEl = document.getElementById('points');
+        if (ptsEl) ptsEl.innerText = userPoints.toLocaleString();
+        var usdEl = document.getElementById('usd-balance');
+        if (usdEl) usdEl.innerText = (userPoints * POINT_RATE).toFixed(4);
+        var bar = document.getElementById('progress-bar');
+        if (bar) bar.style.width = Math.min(100, (userPoints / MIN_WITHDRAWAL) * 100) + "%";
+        var pText = document.getElementById('progress-text');
+        if (pText) pText.innerText = `${userPoints.toLocaleString()} / ${MIN_WITHDRAWAL.toLocaleString()} PTS`;
+        const withdrawBtn = document.getElementById('withdraw-btn');
+        if (!withdrawBtn) return;
+        const canWithdraw = userPoints >= MIN_WITHDRAWAL && (payMethod !== 'TON' || (tonConnectUI && tonConnectUI.connected));
+        if (canWithdraw) {
+            withdrawBtn.removeAttribute('disabled');
+            withdrawBtn.className = "w-full py-3.5 px-4 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 active:scale-98 transition-all duration-200 text-white font-bold rounded-2xl shadow-lg shadow-emerald-500/20 cursor-pointer flex items-center justify-center gap-2";
+        } else {
+            withdrawBtn.setAttribute('disabled', 'true');
+            withdrawBtn.className = "w-full py-3.5 px-4 bg-slate-800 text-slate-500 font-bold rounded-2xl cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 border border-slate-800";
+        }
+    }
+
+    if (tonConnectUI && tonConnectUI.onStatusChange) {
+        try {
+            tonConnectUI.onStatusChange(wallet => {
+                if (wallet && payMethod === 'TON') {
+                    document.getElementById('walletInput').value = wallet.account.address;
+                }
+                updateUI();
+            });
+        } catch(e){ console.log("onStatusChange failed", e); }
+    }
+
+    // CHECKED - Adsgram failsafe with typeof check
+    let adController = null;
+    try {
+        if (typeof window.Adsgram !== 'undefined' && window.Adsgram && window.Adsgram.init) {
+            adController = window.Adsgram.init({ blockId: "58231", debug: false });
+        } else { throw new Error("Adsgram not loaded"); }
+    } catch (e) {
+        console.log("Adsgram load failed", e);
+    }
+
+    async function showAdsgramAd() {
+        const btn = document.getElementById('watch-ad-btn');
+        if (!adController) {
+            tg.showAlert("ကြော်ငြာ Load မဖြစ်သေးပါ။ VPN ပိတ်ပြီး ထပ်ကြိုးစားပါ။");
+            return;
+        }
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ကြော်ငြာဖွင့်နေသည်...`;
+        let adSuccess = false;
+        let attempts = 0;
+        const maxAttempts = 2;
+        while (attempts < maxAttempts && !adSuccess) {
+            attempts++;
+            try {
+                const adParams = telegramUserId ? { userId: telegramUserId.toString() } : {};
+                const result = await adController.show(adParams);
+                if (result && result.done) { adSuccess = true; }
+            } catch (err) {
+                console.log(`Attempt ${attempts} failed:`, err);
+                if (attempts < maxAttempts) { await new Promise(resolve => setTimeout(resolve, 1000)); }
+            }
+        }
+        if (adSuccess) {
+            if(telegramUserId) {
+                try {
+                    const res = await fetch('/api/index', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'watched_ad', userId: telegramUserId })
+                    });
+                    const data = await res.json();
+                    if (data.success && typeof data.points === 'number') {
+                        userPoints = data.points;
+                        saveUserPoints();
+                        updateUI();
+                    } else {
+                        userPoints += 15;
+                        saveUserPoints();
+                        updateUI();
+                    }
+                } catch (e) {
+                    userPoints += 15;
+                    saveUserPoints();
+                    updateUI();
+                }
+            } else {
+                userPoints += 15;
+                saveUserPoints();
+                updateUI();
+            }
+            tg.showAlert("ဂုဏ်ယူပါတယ်! ကြော်ငြာကြည့်ရှုပြီး 15 PTS ရရှိသွားပါပြီ။");
+        } else {
+            tg.showAlert("လက်တလောတွင် ကြော်ငြာမရှိသေးပါ (သို့မဟုတ်) VPN ကြောင့် ချိတ်ဆက်မှု အဆင်မပြေပါ။ ခဏနေမှ ထပ်ကြိုးစားပါ။");
+        }
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-circle-play text-lg"></i> <span>ဗီဒီယိုကြော်ငြာကြည့်မည် (Watch Ad)</span>`;
+    }
+
+    async function withdrawFunds() {
+        let walletAddress = document.getElementById('walletInput').value.trim();
+        if (payMethod === 'TON') {
+            if (!tonConnectUI || !tonConnectUI.connected) {
+                tg.showAlert("ကျေးဇူးပြု၍ Tonkeeper ပိုက်ဆံအိတ်ကို အရင်ချိတ်ဆက်ပါ။");
+                return;
+            }
+            walletAddress = (tonConnectUI.account && tonConnectUI.account.address) || walletAddress;
+        }
+        if (!walletAddress) {
+            tg.showAlert(payMethod === 'TON' ? "Wallet လိပ်စာ မပါပါ" : payMethod + " ဖုန်းနံပါတ် ထည့်ပါ");
+            return;
+        }
+        if (userPoints < MIN_WITHDRAWAL) {
+            tg.showAlert("ငွေထုတ်ရန် အနည်းဆုံး 1,500 PTS လိုအပ်ပါသည်။");
+            return;
+        }
+        try {
+            const res = await fetch('/api/index', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'request_withdraw', userId: telegramUserId, walletAddress: walletAddress, payMethod: payMethod })
+            });
+            const data = await res.json();
+            if (data.success) {
+                userPoints = typeof data.points === 'number' ? data.points : 0;
+                saveUserPoints();
+                updateUI();
+                tg.showAlert("ငွေထုတ်ယူမှုတောင်းဆိုမှု အောင်မြင်ပါသည်။ Admin ဘက်မှ စစ်ဆေးပြီး " + payMethod + " ကနေ ပို့ပေးပါမည်။");
+            } else {
+                tg.showAlert(data.error || "ငွေထုတ်ယူခြင်း မအောင်မြင်ပါ။");
+            }
+        } catch (e) {
+            tg.showAlert("ငွေထုတ်ယူခြင်း ပျက်ပြားသွားပါပြီ သို့မဟုတ် ငြင်းပယ်ခံရပါသည်။");
+        }
+    }
+
+    // CHECKED - Final safety: force updateUI once at end
+    try { updateUI(); } catch(e){ console.log("updateUI failed", e); }
+  </script>
+</body>
+  </html>
