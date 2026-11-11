@@ -27,7 +27,8 @@ function verifyTelegram(initData) {
   } catch (e) { return null; }
 }
 
-module.exports = async (req, res) => {
+// FIXED - Changed from module.exports to export default to match "type": "module" in package.json
+export default async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -141,6 +142,12 @@ module.exports = async (req, res) => {
                     return res.status(200).json({ success: false, error: "Wallet လိပ်စာ မပါပါ" });
                 }
 
+                // FIXED - Added payMethod: TON / KPay / WavePay - Frontend sends this, Backend must accept it
+                const payMethod = body.payMethod || "TON";
+                if (!["TON", "KPay", "WavePay"].includes(payMethod)) {
+                    return res.status(200).json({ success: false, error: "Payment Method မမှန်ပါ" });
+                }
+
                 await redis.set(userKey, 0);
                 await redis.set(`user:${stringUserId}:pending_withdraw`, points);
 
@@ -148,6 +155,7 @@ module.exports = async (req, res) => {
                 await redis.set(`withdraw:${withdrawId}`, JSON.stringify({
                     userId: stringUserId,
                     walletAddress: walletAddress,
+                    payMethod: payMethod, // FIXED - Save which method user chose, so Admin knows how to pay
                     points: points,
                     status: 'pending',
                     createdAt: new Date().toISOString()
