@@ -10,21 +10,7 @@ const redis = new Redis({
   token: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-const AD_TEXT = `🔥 Watch & Earn - ကြော်ငြာကြည့်ပြီး ပိုက်ဆံရှာပါ!
-
-ကြော်ငြာ 1 ခု ကြည့်တိုင်း = +15 Points
-သူငယ်ချင်းခေါ်တိုင်း = +100 Points
-1500 Points ပြည့်တာနဲ့ ထုတ်လို့ရပြီ!
-
-TON / KPay / WavePay နဲ့ ထုတ်လို့ရတယ်
-အလကား - ဘာမှပေးစရာမလိုဘူး
-နေ့တိုင်း ကြော်ငြာကြည့်ပြီး ရှာလို့ရတယ်
-
-အခုပဲ စလိုက်ပါ!`;
-
-const START_TEXT = AD_TEXT + `
-
-စဖို့ အောက်က Button ကိုနှိပ်ပါ`;
+const START_TEXT = `TG Watch - App ဖွင့်ရန် အောက်က Button ကိုနှိပ်ပါ`;
 
 bot.start(async (ctx) => {
   try {
@@ -36,17 +22,8 @@ bot.start(async (ctx) => {
   }
 });
 
-bot.on('text', async (ctx) => {
-  if (ctx.message.text.startsWith('/')) return;
-  try { await ctx.reply(AD_TEXT); } catch (e) {}
-});
-
-bot.command('ad', async (ctx) => {
-  await ctx.reply(AD_TEXT);
-});
-
 bot.help(async (ctx) => {
-  await ctx.reply(AD_TEXT);
+  await ctx.reply(START_TEXT);
 });
 
 function verifyTelegram(initData) {
@@ -78,9 +55,6 @@ export default async (req, res) => {
         }
         if (req.method === 'POST') {
             const { action, userId, startPayload, initData, walletAddress } = body;
-            if (action === 'get_ad_text') {
-                return res.status(200).json({ success: true, adText: AD_TEXT });
-            }
             if (!userId) {
                 return res.status(400).json({ success: false, error: "Missing userId" });
             }
