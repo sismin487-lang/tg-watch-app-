@@ -195,12 +195,8 @@
         updateUI();
     }
 
-    // Bot ထဲကနေ ထွက်သွားချိန် သို့မဟုတ် App ပိတ်ချိန်တွင် Wallet ပါ အလိုအလျောက် ဖြုတ်ရန်
-    window.addEventListener('beforeunload', () => {
-        if (tonConnectUI && tonConnectUI.connected) {
-            tonConnectUI.disconnect().catch(e => console.log("Disconnect error on exit"));
-        }
-    });
+    // FIX 2: အရင်က ရှိခဲ့တဲ့ beforeunload မှာ Wallet ဖြုတ်တာကို ဖျက်လိုက်ပြီ
+    // App ပိတ်တိုင်း Wallet ပြုတ်နေတာကို မဖြစ်တော့ဘူး
 
     function saveUserPoints() {
         if (telegramUserId) {
@@ -276,20 +272,35 @@
         }
 
         if (adSuccess) {
-            userPoints += 15;
-            saveUserPoints();
-            updateUI();
-
+            // FIX 3: အရင်လို Local မှာ +15 အရင်တိုးတာကို ဖျက်ပြီး Backend က ပေးတဲ့ Points ကိုပဲ ယူမယ်
             if(telegramUserId) {
                 try {
-                    fetch('/api/index', {
+                    const res = await fetch('/api/index', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ action: 'watched_ad', userId: telegramUserId })
-                    }).catch(e => console.log("Server sync failed, local data kept safe."));
+                    });
+                    const data = await res.json();
+                    if (data.success && typeof data.points === 'number') {
+                        userPoints = data.points;
+                        saveUserPoints();
+                        updateUI();
+                    } else {
+                        // Backend မရရင် အရင်အတိုင်း Local မှာ ယာယီ တိုးထားမယ်
+                        userPoints += 15;
+                        saveUserPoints();
+                        updateUI();
+                    }
                 } catch (e) {
                     console.log("Sync error");
+                    userPoints += 15;
+                    saveUserPoints();
+                    updateUI();
                 }
+            } else {
+                userPoints += 15;
+                saveUserPoints();
+                updateUI();
             }
 
             tg.showAlert("ဂုဏ်ယူပါတယ်! ကြော်ငြာကြည့်ရှုပြီး 15 PTS ရရှိသွားပါပြီ။");
@@ -312,21 +323,26 @@
             return;
         }
 
+        // FIX 1: အရင်လို User ကနေ Admin ကို TON ပို့တဲ့ sendTransaction ကို ဖျက်လိုက်ပြီ
+        // အခု Backend ကိုပဲ တောင်းဆိုမယ် - User ဆီက ပိုက်ဆံ ဖြတ်မှာ မဟုတ်တော့ဘူး
         try {
-            const transaction = {
-                validUntil: Math.floor(Date.now() / 1000) + 600,
-                messages: [{
-                    address: "UQCza6oW4JvekuwTU0VkLjq_q8Ob0fJuzbQpHGkUo2VhnHUm",
-                    amount: "1000000"
-                }]
-            };
+            const walletAddress = tonConnectUI.account?.address;
 
-            await tonConnectUI.sendTransaction(transaction);
-            tg.showAlert("ငွေထုတ်ယူမှုတောင်းဆိုမှု အောင်မြင်ပါသည်။ Admin ဘက်မှ စစ်ဆေးပြီး ပို့ဆောင်ပေးပါမည်။");
-            
-            userPoints = 0;
-            saveUserPoints();
-            updateUI();
+            const res = await fetch('/api/index', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'request_withdraw', userId: telegramUserId, walletAddress: walletAddress })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                userPoints = typeof data.points === 'number' ? data.points : 0;
+                saveUserPoints();
+                updateUI();
+                tg.showAlert("ငွေထုတ်ယူမှုတောင်းဆိုမှု အောင်မြင်ပါသည်။ Admin ဘက်မှ စစ်ဆေးပြီး ပို့ဆောင်ပေးပါမည်။");
+            } else {
+                tg.showAlert(data.error || "ငွေထုတ်ယူခြင်း မအောင်မြင်ပါ။");
+            }
         } catch (e) {
             tg.showAlert("ငွေထုတ်ယူခြင်း ပျက်ပြားသွားပါပြီ သို့မဟုတ် ငြင်းပယ်ခံရပါသည်။");
         }
