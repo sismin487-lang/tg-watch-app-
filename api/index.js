@@ -2,7 +2,7 @@ import { Telegraf } from 'telegraf';
 import { Redis } from '@upstash/redis';
 import crypto from 'crypto';
 
-// FIXED - Don't write Token in code, take it only from Vercel Env
+// Token only from Vercel Env, never hardcoded
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const bot = new Telegraf(token);
 
@@ -11,7 +11,7 @@ const redis = new Redis({
   token: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-// ===== ခုနက ကြော်ငြာစာသား - ဒီထဲမှာ ထည့်ထားပြီ =====
+// Ad text
 const AD_TEXT = ` MyanMyanPay - ကြော်ငြာကြည့်ပြီး ပိုက်ဆံရှာပါ!
 
  ကြော်ငြာ 1 ခု ကြည့်တိုင်း = +15 Points
@@ -28,9 +28,7 @@ const START_TEXT = AD_TEXT + `
 
  စဖို့ အောက်က Button ကိုနှိပ်ပါ `;
 
-// Bot /start နှိပ်ရင် ကြော်ငြာစာသား ပို့မယ်
-// FIXED - အရင် web_app url မှာ t.me ပေးထားလို့ Telegram က reply ကို ပယ်ချပြီး စာမဝင်တာ
-// WEBAPP_URL မရှိရင် url button သုံးမယ်, ရှိရင်မှ web_app သုံးမယ်
+// Bot /start handler
 bot.start(async (ctx) => {
   try {
     const webappUrl = process.env.WEBAPP_URL;
@@ -40,28 +38,25 @@ bot.start(async (ctx) => {
     await ctx.reply(START_TEXT, { reply_markup: { inline_keyboard: keyboard } });
   } catch (e) {
     console.error('start error:', e);
-    // Button ကြောင့် fail ရင် စာသက်သက်ပဲ ပြန်ပို့မယ် - စာလုံးဝ မဝင်တာမျိုး မဖြစ်တော့ဘူး
     try { await ctx.reply(START_TEXT); } catch (e2) { console.error('start fallback error:', e2); }
   }
 });
 
-// FIXED - /start မဟုတ်တဲ့ စာမှန်သမျှကိုလည်း ကြော်ငြာစာသား ပြန်ပို့မယ်, စမ်းလို့ရအောင်
+// Reply ad text to any non-command text
 bot.on('text', async (ctx) => {
   if (ctx.message.text.startsWith('/')) return;
   try { await ctx.reply(AD_TEXT); } catch (e) { console.error('text error:', e); }
 });
 
-// /ad လို့ ရိုက်ရင် ကြော်ငြာစာသား ပြန်ပို့မယ်
 bot.command('ad', async (ctx) => {
   await ctx.reply(AD_TEXT);
 });
 
-// /help
 bot.help(async (ctx) => {
   await ctx.reply(AD_TEXT);
 });
 
-// FIXED - Added to check if Telegram initData is real or fake
+// Verify Telegram initData
 function verifyTelegram(initData) {
   if (!initData || !token) return null;
   try {
@@ -85,7 +80,8 @@ export default async (req, res) => {
     if (req.method === 'OPTIONS') return res.status(200).end();
 
     try {
-        const body = req.body || {};
+        let body = req.body || {};
+        if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
         
         if (body.update_id) {
             try {
@@ -99,7 +95,6 @@ export default async (req, res) => {
         if (req.method === 'POST') {
             const { action, userId, startPayload, initData, walletAddress } = body;
 
-            // ကြော်ငြာစာသား Frontend က တောင်းရင် ဒီကနေ ပြန်ပေးမယ်
             if (action === 'get_ad_text') {
                 return res.status(200).json({ success: true, adText: AD_TEXT });
             }
@@ -112,7 +107,6 @@ export default async (req, res) => {
             const userKey = `user:${stringUserId}:points`;
             const refCheckedKey = `user:${stringUserId}:ref_checked`;
 
-            // FIXED - If initData is sent, check if it is real
             if (initData) {
                 const tgUser = verifyTelegram(initData);
                 if (!tgUser || String(tgUser.id) !== stringUserId) {
@@ -128,7 +122,7 @@ export default async (req, res) => {
                     await redis.set(userKey, points);
                 }
 
-                // Check Referral and add points (+100 PTS)
+                // Referral +100 PTS
                 if (action === 'login' && startPayload) {
                     const referrerId = startPayload.toString().replace('ref_', '').trim();
                     const isRefChecked = await redis.get(refCheckedKey);
@@ -160,7 +154,7 @@ export default async (req, res) => {
             }
 
             if (action === 'watched_ad') {
-                // FIXED - To prevent Ad Spam, give points only once per 10 seconds
+                // 10 seconds throttle to prevent spam
                 const lastAdKey = `user:${stringUserId}:last_ad`;
                 const lastAd = await redis.get(lastAdKey);
                 const now = Date.now();
@@ -183,8 +177,20 @@ export default async (req, res) => {
                 });
             }
 
-            // FIXED - Added request_withdraw which did not exist before
-            // Frontend was sending this but Backend did not accept it, so Withdraw did not work
+            if (action === 'vpn_bonus') {
+                const today = new Date().toISOString().slice(0, 10);
+                const vpnKey = `user:${stringUserId}:vpn_bonus:${today}`;
+                const count = parseInt(await redis.get(vpnKey)) || 0;
+                if (count >= 10) {
+                    const cur = await redis.get(userKey);
+                    return res.status(200).json({ success: true, points: parseInt(cur || 0, 10), limitReached: true });
+                }
+                await redis.incr(vpnKey);
+                await redis.expire(vpnKey, 86400);
+                const points = await redis.incrby(userKey, 5);
+                return res.status(200).json({ success: true, points: parseInt(points, 10), limitReached: false });
+            }
+
             if (action === 'request_withdraw') {
                 let points = await redis.get(userKey);
                 points = parseInt(points || 0, 10);
@@ -196,7 +202,7 @@ export default async (req, res) => {
                     return res.status(200).json({ success: false, error: "Wallet လိပ်စာ မပါပါ" });
                 }
 
-                // FIXED - Added payMethod: TON / KPay / WavePay
+                // payMethod: TON / KPay / WavePay
                 const payMethod = body.payMethod || "TON";
                 if (!["TON", "KPay", "WavePay"].includes(payMethod)) {
                     return res.status(200).json({ success: false, error: "Payment Method မမှန်ပါ" });
@@ -215,7 +221,7 @@ export default async (req, res) => {
                     createdAt: new Date().toISOString()
                 }));
 
-                // FIXED - Notify Admin when user requests withdraw
+                // Notify Admin on withdraw
                 try {
                     const adminId = process.env.ADMIN_ID;
                     if (adminId) {
@@ -234,7 +240,6 @@ export default async (req, res) => {
         }
 
         if (req.method === 'GET') {
-            // Browser မှာ https://<vercel-domain>/api/index?setup=1 လို့ ဖွင့်ရင် Webhook အလိုလို ချိတ်ပေးမယ်
             if (req.query && req.query.setup === '1') {
                 const host = req.headers.host;
                 const webhookUrl = `https://${host}/api/index`;
