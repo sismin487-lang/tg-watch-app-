@@ -27,7 +27,6 @@ function verifyTelegram(initData) {
   } catch (e) { return null; }
 }
 
-// FIXED - Changed from module.exports to export default to match "type": "module" in package.json
 export default async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
@@ -142,7 +141,7 @@ export default async (req, res) => {
                     return res.status(200).json({ success: false, error: "Wallet လိပ်စာ မပါပါ" });
                 }
 
-                // FIXED - Added payMethod: TON / KPay / WavePay - Frontend sends this, Backend must accept it
+                // FIXED - Added payMethod: TON / KPay / WavePay
                 const payMethod = body.payMethod || "TON";
                 if (!["TON", "KPay", "WavePay"].includes(payMethod)) {
                     return res.status(200).json({ success: false, error: "Payment Method မမှန်ပါ" });
@@ -155,7 +154,7 @@ export default async (req, res) => {
                 await redis.set(`withdraw:${withdrawId}`, JSON.stringify({
                     userId: stringUserId,
                     walletAddress: walletAddress,
-                    payMethod: payMethod, // FIXED - Save which method user chose, so Admin knows how to pay
+                    payMethod: payMethod,
                     points: points,
                     status: 'pending',
                     createdAt: new Date().toISOString()
