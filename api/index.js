@@ -160,6 +160,20 @@ export default async (req, res) => {
                     createdAt: new Date().toISOString()
                 }));
 
+                // FIXED - Notify Admin when user requests withdraw
+                try {
+                    const adminId = process.env.ADMIN_ID;
+                    if (adminId) {
+                        await bot.telegram.sendMessage(adminId,
+                            ` Withdraw အသစ်!\n\n` +
+                            `User ID: ${stringUserId}\n` +
+                            `Method: ${payMethod}\n` +
+                            `Account: ${walletAddress}\n` +
+                            `Points: ${points} PTS`
+                        );
+                    }
+                } catch (e) { console.log("Admin notify failed", e); }
+
                 return res.status(200).json({ success: true, points: 0 });
             }
         }
