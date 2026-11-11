@@ -15,6 +15,10 @@
     .pay-opt.active{border-color:#22c55e;background:#14532d}
     .pay-opt img{width:44px;height:44px;object-fit:contain;border-radius:10px;background:#fff;margin:0 auto;display:block}
     .pay-opt div{font-size:12px;font-weight:bold;margin-top:6px}
+    .money-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;width:100%}
+    .money-box{background:#020617;border:1px solid #1e293b;border-radius:14px;padding:8px 4px;text-align:center}
+    .money-box .m-label{font-size:10px;color:#94a3b8;font-weight:600}
+    .money-box .m-val{font-size:13px;font-weight:800;margin-top:2px}
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-between p-4 selection:bg-sky-500 selection:text-white">
@@ -40,9 +44,23 @@
       <div class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-300 via-sky-400 to-blue-400 tracking-tight my-1">
         <span id="points">0</span> <span class="text-2xl font-bold text-sky-400">PTS</span>
       </div>
-      <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-xs text-emerald-400 font-semibold">
-        <i class="fa-solid fa-wallet"></i> $<span id="usd-balance">0.0000</span> USD
+
+      <div class="money-grid">
+        <div class="money-box">
+          <div class="m-label">💵 USD</div>
+          <div class="m-val text-emerald-400">$<span id="usd-balance">0.0000</span></div>
+        </div>
+        <div class="money-box">
+          <div class="m-label">💎 TON</div>
+          <div class="m-val text-sky-400"><span id="ton-balance">0.0000</span> TON</div>
+        </div>
+        <div class="money-box">
+          <div class="m-label">🇲🇲 ကျပ် (MMK)</div>
+          <div class="m-val text-amber-400"><span id="mmk-balance">0</span> ကျပ်</div>
+        </div>
       </div>
+      <div class="text-[11px] text-slate-500">1,500 PTS = $0.15 = 0.1327 TON = 702 ကျပ် (1 USD = 4,678 MMK)</div>
+
       <div class="w-full bg-slate-950/60 rounded-xl p-3 border border-slate-800/50 mt-2 text-left">
         <div class="flex justify-between text-[11px] text-slate-400 font-medium mb-1.5">
           <span>Min Withdrawal Progress</span>
@@ -131,7 +149,6 @@
   </div>
 
   <script>
-    // CHECKED - Safe Telegram init, if Telegram missing, buttons still work
     const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : {
       ready: function(){}, expand: function(){},
       showAlert: function(m){ alert(m); },
@@ -140,14 +157,15 @@
     try { tg.ready(); } catch(e){}
     try { tg.expand(); } catch(e){}
 
-    const POINT_RATE = 0.0001; 
+    const POINT_RATE = 0.0001;
+    const TON_PRICE_USD = 1.13;
+    const USD_TO_MMK = 4678;
     const MIN_WITHDRAWAL = 1500;
     let telegramUserId = null;
     let userPoints = 0;
     let payMethod = "TON";
     const botUsername = "Adsgram12_bot"; 
 
-    // CHECKED - TonConnect failsafe with typeof check
     let tonConnectUI = null;
     try {
         if (typeof TON_CONNECT_UI !== 'undefined' && TON_CONNECT_UI && TON_CONNECT_UI.TonConnectUI) {
@@ -157,7 +175,6 @@
             });
         } else { throw new Error("TON_CONNECT_UI not loaded"); }
     } catch (e) {
-        console.log("TonConnect load failed, buttons still work", e);
         tonConnectUI = {
             connected: false,
             account: null,
@@ -166,7 +183,6 @@
         };
     }
 
-    // CHECKED - Always set invite link first, even if Telegram fails
     function setDefaultRefLink() {
         var el = document.getElementById('ref-link-input');
         if (el && el.value === "Loading invite link...") {
@@ -279,8 +295,15 @@
     function updateUI() {
         var ptsEl = document.getElementById('points');
         if (ptsEl) ptsEl.innerText = userPoints.toLocaleString();
+        var usd = userPoints * POINT_RATE;
+        var ton = usd / TON_PRICE_USD;
+        var mmk = Math.floor(usd * USD_TO_MMK);
         var usdEl = document.getElementById('usd-balance');
-        if (usdEl) usdEl.innerText = (userPoints * POINT_RATE).toFixed(4);
+        if (usdEl) usdEl.innerText = usd.toFixed(4);
+        var tonEl = document.getElementById('ton-balance');
+        if (tonEl) tonEl.innerText = ton.toFixed(4);
+        var mmkEl = document.getElementById('mmk-balance');
+        if (mmkEl) mmkEl.innerText = mmk.toLocaleString();
         var bar = document.getElementById('progress-bar');
         if (bar) bar.style.width = Math.min(100, (userPoints / MIN_WITHDRAWAL) * 100) + "%";
         var pText = document.getElementById('progress-text');
@@ -308,7 +331,6 @@
         } catch(e){ console.log("onStatusChange failed", e); }
     }
 
-    // CHECKED - Adsgram failsafe with typeof check
     let adController = null;
     try {
         if (typeof window.Adsgram !== 'undefined' && window.Adsgram && window.Adsgram.init) {
@@ -336,7 +358,6 @@
                 const result = await adController.show(adParams);
                 if (result && result.done) { adSuccess = true; }
             } catch (err) {
-                console.log(`Attempt ${attempts} failed:`, err);
                 if (attempts < maxAttempts) { await new Promise(resolve => setTimeout(resolve, 1000)); }
             }
         }
@@ -413,8 +434,7 @@
         }
     }
 
-    // CHECKED - Final safety: force updateUI once at end
     try { updateUI(); } catch(e){ console.log("updateUI failed", e); }
   </script>
 </body>
-  </html>
+</html>
