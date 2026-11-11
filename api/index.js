@@ -11,6 +11,49 @@ const redis = new Redis({
   token: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
+// ===== ခုနက ကြော်ငြာစာသား - ဒီထဲမှာ ထည့်ထားပြီ =====
+const AD_TEXT = `💰 MyanMyanPay - ကြော်ငြာကြည့်ပြီး ပိုက်ဆံရှာပါ!
+
+📺 ကြော်ငြာ 1 ခု ကြည့်တိုင်း = +15 Points
+🎁 သူငယ်ချင်းခေါ်တိုင်း = +100 Points
+💸 1500 Points ပြည့်တာနဲ့ ထုတ်လို့ရပြီ!
+
+✅ TON / KPay / WavePay နဲ့ ထုတ်လို့ရတယ်
+✅ အလကား - ဘာမှပေးစရာမလိုဘူး
+✅ နေ့တိုင်း ကြော်ငြာကြည့်ပြီး ရှာလို့ရတယ်
+
+👇 အခုပဲ စလိုက်ပါ!`;
+
+const START_TEXT = AD_TEXT + `
+
+🚀 စဖို့ အောက်က Button ကိုနှိပ်ပါ 👇`;
+
+// Bot /start နှိပ်ရင် ကြော်ငြာစာသား ပို့မယ်
+bot.start(async (ctx) => {
+  try {
+    const startPayload = ctx.startPayload || '';
+    await ctx.reply(START_TEXT, {
+      reply_markup: {
+        inline_keyboard: [[
+          { text: '🚀 App ဖွင့်မယ်', web_app: { url: process.env.WEBAPP_URL || 'https://t.me/myanmyanpay_sithu_bot' } }
+        ],[
+          { text: '👥 သူငယ်ချင်းခေါ်မယ် (+100)', switch_inline_query: `ref_${ctx.from.id}` }
+        ]]
+      }
+    });
+  } catch (e) { console.error('start error:', e); }
+});
+
+// /ad လို့ ရိုက်ရင် ကြော်ငြာစာသား ပြန်ပို့မယ်
+bot.command('ad', async (ctx) => {
+  await ctx.reply(AD_TEXT);
+});
+
+// /help
+bot.help(async (ctx) => {
+  await ctx.reply(AD_TEXT);
+});
+
 // FIXED - Added to check if Telegram initData is real or fake
 function verifyTelegram(initData) {
   if (!initData || !token) return null;
@@ -48,6 +91,11 @@ export default async (req, res) => {
 
         if (req.method === 'POST') {
             const { action, userId, startPayload, initData, walletAddress } = body;
+
+            // ကြော်ငြာစာသား Frontend က တောင်းရင် ဒီကနေ ပြန်ပေးမယ်
+            if (action === 'get_ad_text') {
+                return res.status(200).json({ success: true, adText: AD_TEXT });
+            }
             
             if (!userId) {
                 return res.status(400).json({ success: false, error: "Missing userId" });
