@@ -19,6 +19,9 @@
     .money-box{background:#020617;border:1px solid #1e293b;border-radius:14px;padding:8px 4px;text-align:center}
     .money-box .m-label{font-size:10px;color:#94a3b8;font-weight:600}
     .money-box .m-val{font-size:13px;font-weight:800;margin-top:2px}
+    /* Full-Screen Fallback Ad Modal */
+    #fallback-ad-modal{display:none;position:fixed;inset:0;z-index:9999;background:#020617;flex-direction:column;justify-content:space-between;padding:20px}
+    #fallback-ad-modal.show{display:flex}
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-between p-4 selection:bg-sky-500 selection:text-white">
@@ -78,7 +81,7 @@
       </div>
       <div>
         <h3 class="text-base font-bold text-slate-100">ဗီဒီယိုကြော်ငြာကြည့်ပါ</h3>
-        <p class="text-xs text-slate-400 mt-1">ကြော်ငြာ ၁ ကြိမ်ကြည့်လျှင် <span class="text-sky-400 font-semibold">+15 PTS</span> ရရှိမည်။</p>
+        <p class="text-xs text-slate-400 mt-1">ကြော်ငြာ ၁ ကြိမ်ကြည့်လျှင် <span class="text-sky-400 font-semibold">+15 PTS</span> ရရှိမည်။ (ယနေ့ <span id="daily-ad-count" class="text-emerald-400 font-bold">0</span>/20)</p>
       </div>
       <button id="watch-ad-btn" onclick="showAdsgramAd()" class="w-full py-3.5 px-4 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 active:scale-98 transition-all duration-200 text-white font-bold rounded-2xl shadow-lg shadow-sky-500/20 flex items-center justify-center gap-2 cursor-pointer">
         <i class="fa-solid fa-circle-play text-lg"></i>
@@ -144,6 +147,30 @@
     </div>
   </div>
 
+  <!-- Full-Screen Fallback Ad Modal (10s Countdown) -->
+  <div id="fallback-ad-modal">
+    <div class="flex items-center justify-between text-xs text-slate-300 bg-slate-900/90 border border-slate-800 rounded-2xl px-4 py-3">
+      <span class="font-bold text-sky-400"><i class="fa-solid fa-bullhorn mr-1"></i> Sponsored Ad</span>
+      <span id="fallback-timer-text" class="font-mono font-bold text-amber-400">10s</span>
+    </div>
+
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center my-auto flex flex-col items-center gap-3 shadow-2xl">
+      <div class="w-16 h-16 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 text-3xl">
+        <i class="fa-solid fa-play"></i>
+      </div>
+      <h3 class="text-lg font-black text-white">Tg Watch Partner Promo</h3>
+      <p class="text-xs text-slate-400 leading-relaxed">ကြော်ငြာကို ၁၀ စက္ကန့်ပြည့်အောင် စောင့်ပြီး <span class="text-sky-400 font-bold">+15 PTS</span> ရယူပါ။</p>
+      <a href="https://t.me/silent487" target="_blank" rel="noopener noreferrer" class="mt-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl inline-flex items-center gap-1.5">
+        <i class="fa-brands fa-telegram"></i>
+        <span>Open Channel</span>
+      </a>
+    </div>
+
+    <button id="fallback-claim-btn" onclick="claimFallbackReward()" disabled class="w-full py-3.5 px-4 bg-slate-800 text-slate-500 font-bold rounded-2xl cursor-not-allowed transition-all duration-200">
+      ခဏစောင့်ပါ (10s)...
+    </button>
+  </div>
+
   <div class="text-center text-[10px] text-slate-600 mt-4 font-mono">
     Tg Watch Mini App v1.0  Powered by Adsgram & TON
   </div>
@@ -161,10 +188,54 @@
     const TON_PRICE_USD = 1.13;
     const USD_TO_MMK = 4678;
     const MIN_WITHDRAWAL = 1500;
+    const DAILY_AD_LIMIT = 20;
+    const FALLBACK_AD_SECONDS = 10;
     let telegramUserId = null;
     let userPoints = 0;
     let payMethod = "TON";
-    const botUsername = "Adsgram12_bot"; 
+    const botUsername = "Adsgram12_bot";
+
+    let fallbackTimer = null;
+    let fallbackDone = false;
+
+    function getTodayDateStr() {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    function getDailyAdStorageKey() {
+      const uid = telegramUserId ? telegramUserId.toString() : 'guest';
+      return `tg_watch_daily_ads_${uid}_${getTodayDateStr()}`;
+    }
+
+    function getTodayAdCount() {
+      const val = parseInt(localStorage.getItem(getDailyAdStorageKey()) || '0', 10);
+      return Number.isNaN(val) ? 0 : val;
+    }
+
+    function incrementTodayAdCount() {
+      const next = getTodayAdCount() + 1;
+      localStorage.setItem(getDailyAdStorageKey(), String(next));
+      return next;
+    }
+
+    function updateAdButtonState() {
+      const count = getTodayAdCount();
+      const countEl = document.getElementById('daily-ad-count');
+      if (countEl) countEl.innerText = count;
+      const btn = document.getElementById('watch-ad-btn');
+      if (!btn) return;
+      if (count >= DAILY_AD_LIMIT) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-ban"></i> <span>ယနေ့ ကြော်ငြာကြည့်ခွင့် ပြည့်ပါပြီ (${DAILY_AD_LIMIT}/${DAILY_AD_LIMIT})</span>`;
+      } else if (!btn.dataset.busy) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-circle-play text-lg"></i> <span>ဗီဒီယိုကြော်ငြာကြည့်မည် (Watch Ad)</span>`;
+      }
+    }
 
     let tonConnectUI = null;
     try {
@@ -308,6 +379,7 @@
         if (bar) bar.style.width = Math.min(100, (userPoints / MIN_WITHDRAWAL) * 100) + "%";
         var pText = document.getElementById('progress-text');
         if (pText) pText.innerText = `${userPoints.toLocaleString()} / ${MIN_WITHDRAWAL.toLocaleString()} PTS`;
+        updateAdButtonState();
         const withdrawBtn = document.getElementById('withdraw-btn');
         if (!withdrawBtn) return;
         const canWithdraw = userPoints >= MIN_WITHDRAWAL && (payMethod !== 'TON' || (tonConnectUI && tonConnectUI.connected));
@@ -340,61 +412,115 @@
         console.log("Adsgram load failed", e);
     }
 
-    async function showAdsgramAd() {
-        const btn = document.getElementById('watch-ad-btn');
-        if (!adController) {
-            tg.showAlert("ကြော်ငြာ Load မဖြစ်သေးပါ။ VPN ပိတ်ပြီး ထပ်ကြိုးစားပါ။");
-            return;
-        }
-        btn.disabled = true;
-        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ကြော်ငြာဖွင့်နေသည်...`;
-        let adSuccess = false;
-        let attempts = 0;
-        const maxAttempts = 2;
-        while (attempts < maxAttempts && !adSuccess) {
-            attempts++;
-            try {
-                const adParams = telegramUserId ? { userId: telegramUserId.toString() } : {};
-                const result = await adController.show(adParams);
-                if (result && result.done) { adSuccess = true; }
-            } catch (err) {
-                if (attempts < maxAttempts) { await new Promise(resolve => setTimeout(resolve, 1000)); }
+    function openFallbackModal() {
+        const modal = document.getElementById('fallback-ad-modal');
+        const timerText = document.getElementById('fallback-timer-text');
+        const claimBtn = document.getElementById('fallback-claim-btn');
+        let remaining = FALLBACK_AD_SECONDS;
+        fallbackDone = false;
+
+        claimBtn.disabled = true;
+        claimBtn.className = "w-full py-3.5 px-4 bg-slate-800 text-slate-500 font-bold rounded-2xl cursor-not-allowed transition-all duration-200";
+        claimBtn.innerText = `ခဏစောင့်ပါ (${remaining}s)...`;
+        timerText.innerText = `${remaining}s`;
+        modal.classList.add('show');
+
+        clearInterval(fallbackTimer);
+        fallbackTimer = setInterval(() => {
+            remaining -= 1;
+            if (remaining > 0) {
+                timerText.innerText = `${remaining}s`;
+                claimBtn.innerText = `ခဏစောင့်ပါ (${remaining}s)...`;
+            } else {
+                clearInterval(fallbackTimer);
+                fallbackDone = true;
+                timerText.innerText = "0s";
+                claimBtn.disabled = false;
+                claimBtn.className = "w-full py-3.5 px-4 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-bold rounded-2xl cursor-pointer transition-all duration-200";
+                claimBtn.innerText = "ဆုလက်ဆောင်ယူမည် (+15 PTS)";
             }
-        }
-        if (adSuccess) {
-            if(telegramUserId) {
-                try {
-                    const res = await fetch('/api/index', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'watched_ad', userId: telegramUserId })
-                    });
-                    const data = await res.json();
-                    if (data.success && typeof data.points === 'number') {
-                        userPoints = data.points;
-                        saveUserPoints();
-                        updateUI();
-                    } else {
-                        userPoints += 15;
-                        saveUserPoints();
-                        updateUI();
-                    }
-                } catch (e) {
+        }, 1000);
+    }
+
+    function resetAdButton() {
+        const btn = document.getElementById('watch-ad-btn');
+        delete btn.dataset.busy;
+        updateAdButtonState();
+    }
+
+    async function grantAdReward() {
+        incrementTodayAdCount();
+        if (telegramUserId) {
+            try {
+                const res = await fetch('/api/index', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'watched_ad', userId: telegramUserId })
+                });
+                const data = await res.json();
+                if (data.success && typeof data.points === 'number') {
+                    userPoints = data.points;
+                    saveUserPoints();
+                    updateUI();
+                } else {
                     userPoints += 15;
                     saveUserPoints();
                     updateUI();
                 }
-            } else {
+            } catch (e) {
                 userPoints += 15;
                 saveUserPoints();
                 updateUI();
             }
-            tg.showAlert("ဂုဏ်ယူပါတယ်! ကြော်ငြာကြည့်ရှုပြီး 15 PTS ရရှိသွားပါပြီ။");
         } else {
-            tg.showAlert("လက်တလောတွင် ကြော်ငြာမရှိသေးပါ (သို့မဟုတ်) VPN ကြောင့် ချိတ်ဆက်မှု အဆင်မပြေပါ။ ခဏနေမှ ထပ်ကြိုးစားပါ။");
+            userPoints += 15;
+            saveUserPoints();
+            updateUI();
         }
-        btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-circle-play text-lg"></i> <span>ဗီဒီယိုကြော်ငြာကြည့်မည် (Watch Ad)</span>`;
+        resetAdButton();
+        tg.showAlert("ဂုဏ်ယူပါတယ်! ကြော်ငြာကြည့်ရှုပြီး 15 PTS ရရှိသွားပါပြီ။");
+    }
+
+    async function claimFallbackReward() {
+        if (!fallbackDone) return;
+        clearInterval(fallbackTimer);
+        document.getElementById('fallback-ad-modal').classList.remove('show');
+        await grantAdReward();
+    }
+
+    async function showAdsgramAd() {
+        if (getTodayAdCount() >= DAILY_AD_LIMIT) {
+            updateAdButtonState();
+            tg.showAlert(`ယနေ့အတွက် ကြော်ငြာကြည့်ခွင့် ${DAILY_AD_LIMIT} ကြိမ် ပြည့်သွားပါပြီ။`);
+            return;
+        }
+
+        const btn = document.getElementById('watch-ad-btn');
+        btn.dataset.busy = "1";
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ကြော်ငြာဖွင့်နေသည်...`;
+
+        let adSuccess = false;
+        if (adController) {
+            let attempts = 0;
+            const maxAttempts = 2;
+            while (attempts < maxAttempts && !adSuccess) {
+                attempts++;
+                try {
+                    const adParams = telegramUserId ? { userId: telegramUserId.toString() } : {};
+                    const result = await adController.show(adParams);
+                    if (result && result.done) { adSuccess = true; }
+                } catch (err) {
+                    if (attempts < maxAttempts) { await new Promise(resolve => setTimeout(resolve, 1000)); }
+                }
+            }
+        }
+
+        if (adSuccess) {
+            await grantAdReward();
+        } else {
+            openFallbackModal();
+        }
     }
 
     async function withdrawFunds() {
