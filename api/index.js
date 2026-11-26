@@ -26,10 +26,9 @@ if (!token) {
 
 const bot = token ? new Telegraf(token) : null;
 
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
-});
+const redisUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+const redisToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+const redis = redisUrl && redisToken ? new Redis({ url: redisUrl, token: redisToken }) : null;
 
 const START_TEXT = `TG Watch - App ဖွင့်ရန် အောက်က Button ကိုနှိပ်ပါ`;
 
@@ -37,12 +36,15 @@ if (bot) {
   bot.start(async (ctx) => {
     try {
       const chatId = ctx.chat.id;
-      await redis.sadd('tg_watch:users', String(chatId));
+      if (redis) {
+        await redis.sadd('tg_watch:users', String(chatId));
+      }
 
       const webappUrl = process.env.WEBAPP_URL || 'https://tg-watch-app.vercel.app';
       const keyboard = [[{ text: 'App ဖွင့်မယ်', web_app: { url: webappUrl } }]];
       await ctx.reply(START_TEXT, { reply_markup: { inline_keyboard: keyboard } });
     } catch (e) {
+      console.error('bot.start error:', e);
       try {
         await ctx.reply(START_TEXT);
       } catch (e2) {}
@@ -81,6 +83,10 @@ function getTodayDateStr() {
 // Mini App / API POST handler
 async function handleApiPost(req, res) {
   try {
+    if (!redis) {
+      return res.status(500).json({ success: false, error: 'Redis configuration missing' });
+    }
+
     let body = req.body || {};
     if (typeof body === 'string') {
       try {
@@ -245,8 +251,37 @@ async function handleApiPost(req, res) {
   }
 }
 
-app.post('/', handleApiPost);
-app.post('/api/index', handleApiPost);
+// Unified POST handler: Telegram Webhook updates vs Mini App API calls
+async function handlePost(req, res) {
+  const body = req.body || {};
+  const isTelegramUpdate =
+    typeof body.update_id === 'number' ||
+    Boolean(body.message || body.edited_message || body.callback_query || body.inline_query || body.my_chat_member || body.chat_member);
+
+  if (isTelegramUpdate) {
+    if (!bot) {
+      return res.status(500).json({ ok: false, error: 'Bot token missing' });
+    }
+    try {
+      await bot.handleUpdate(body, res);
+      if (!res.headersSent) {
+        res.status(200).json({ ok: true });
+      }
+      return;
+    } catch (err) {
+      console.error('Telegram webhook error:', err);
+      if (!res.headersSent) {
+        return res.status(500).json({ ok: false, error: err.message });
+      }
+      return;
+    }
+  }
+
+  return handleApiPost(req, res);
+}
+
+app.post('/', handlePost);
+app.post('/api/index', handlePost);
 
 app.get('/', (req, res) => {
   res.status(200).send('Telegram Bot Server is running!');
