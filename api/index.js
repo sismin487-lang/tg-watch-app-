@@ -17,13 +17,14 @@ app.use((req, res, next) => {
 
 const token = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN;
 const PORT = process.env.PORT || 3000;
+const DAILY_AD_LIMIT = 20;
+const AD_REWARD_POINTS = 15;
 
 if (!token) {
   console.error('Missing TELEGRAM_BOT_TOKEN (or BOT_TOKEN)');
-  process.exit(1);
 }
 
-const bot = new Telegraf(token);
+const bot = token ? new Telegraf(token) : null;
 
 const redis = new Redis({
   url: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL,
@@ -32,24 +33,26 @@ const redis = new Redis({
 
 const START_TEXT = `TG Watch - App ဖွင့်ရန် အောက်က Button ကိုနှိပ်ပါ`;
 
-bot.start(async (ctx) => {
-  try {
-    const chatId = ctx.chat.id;
-    await redis.sadd('tg_watch:users', String(chatId));
-
-    const webappUrl = process.env.WEBAPP_URL || 'https://tg-watch-app.vercel.app';
-    const keyboard = [[{ text: 'App ဖွင့်မယ်', web_app: { url: webappUrl } }]];
-    await ctx.reply(START_TEXT, { reply_markup: { inline_keyboard: keyboard } });
-  } catch (e) {
+if (bot) {
+  bot.start(async (ctx) => {
     try {
-      await ctx.reply(START_TEXT);
-    } catch (e2) {}
-  }
-});
+      const chatId = ctx.chat.id;
+      await redis.sadd('tg_watch:users', String(chatId));
 
-bot.help(async (ctx) => {
-  await ctx.reply(START_TEXT);
-});
+      const webappUrl = process.env.WEBAPP_URL || 'https://tg-watch-app.vercel.app';
+      const keyboard = [[{ text: 'App ဖွင့်မယ်', web_app: { url: webappUrl } }]];
+      await ctx.reply(START_TEXT, { reply_markup: { inline_keyboard: keyboard } });
+    } catch (e) {
+      try {
+        await ctx.reply(START_TEXT);
+      } catch (e2) {}
+    }
+  });
+
+  bot.help(async (ctx) => {
+    await ctx.reply(START_TEXT);
+  });
+}
 
 function verifyTelegram(initData) {
   if (!initData || !token) return null;
@@ -71,7 +74,11 @@ function verifyTelegram(initData) {
   }
 }
 
-// Mini App / API POST handler (အရင် route နဲ့ /api/index နှစ်ခုလုံး ခေါ်နိုင်အောင် ထည့်ထားသည်)
+function getTodayDateStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// Mini App / API POST handler
 async function handleApiPost(req, res) {
   try {
     let body = req.body || {};
@@ -122,31 +129,65 @@ async function handleApiPost(req, res) {
       }
       const finalPoints = await redis.get(userKey);
       const pending = await redis.get(`user:${stringUserId}:pending_withdraw`);
+      const todayAds = parseInt(await redis.get(`user:${stringUserId}:ads:${getTodayDateStr()}`), 10) || 0;
       return res.status(200).json({
         success: true,
         points: parseInt(finalPoints || 0, 10),
         pendingWithdraw: pending ? parseInt(pending, 10) : 0,
+        todayAds,
+        dailyAdLimit: DAILY_AD_LIMIT,
       });
     }
 
     if (action === 'watched_ad') {
+      const today = getTodayDateStr();
+      const dailyAdKey = `user:${stringUserId}:ads:${today}`;
+      const currentAds = parseInt(await redis.get(dailyAdKey), 10) || 0;
+
+      if (currentAds >= DAILY_AD_LIMIT) {
+        const cur = await redis.get(userKey);
+        return res.status(200).json({
+          success: true,
+          points: parseInt(cur || 0, 10),
+          todayAds: currentAds,
+          dailyAdLimit: DAILY_AD_LIMIT,
+          limitReached: true,
+        });
+      }
+
       const lastAdKey = `user:${stringUserId}:last_ad`;
       const lastAd = await redis.get(lastAdKey);
       const now = Date.now();
       if (lastAd && now - parseInt(lastAd, 10) < 10000) {
         const cur = await redis.get(userKey);
-        return res.status(200).json({ success: true, points: parseInt(cur || 0, 10) });
+        return res.status(200).json({
+          success: true,
+          points: parseInt(cur || 0, 10),
+          todayAds: currentAds,
+          dailyAdLimit: DAILY_AD_LIMIT,
+        });
       }
+
       await redis.set(lastAdKey, now);
+      const nextAds = await redis.incr(dailyAdKey);
+      await redis.expire(dailyAdKey, 86400);
+
       let points = await redis.get(userKey);
       if (points === null) points = 0;
-      points = parseInt(points, 10) + 15;
+      points = parseInt(points, 10) + AD_REWARD_POINTS;
       await redis.set(userKey, points);
-      return res.status(200).json({ success: true, points: parseInt(points, 10) });
+
+      return res.status(200).json({
+        success: true,
+        points: parseInt(points, 10),
+        todayAds: parseInt(nextAds, 10),
+        dailyAdLimit: DAILY_AD_LIMIT,
+        limitReached: parseInt(nextAds, 10) >= DAILY_AD_LIMIT,
+      });
     }
 
     if (action === 'vpn_bonus') {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = getTodayDateStr();
       const vpnKey = `user:${stringUserId}:vpn_bonus:${today}`;
       const count = parseInt(await redis.get(vpnKey)) || 0;
       if (count >= 10) {
@@ -188,7 +229,7 @@ async function handleApiPost(req, res) {
       );
       try {
         const adminId = process.env.ADMIN_ID;
-        if (adminId) {
+        if (adminId && bot) {
           await bot.telegram.sendMessage(
             adminId,
             `Withdraw အသစ်!\n\nUser ID: ${stringUserId}\nMethod: ${payMethod}\nAccount: ${walletAddress}\nPoints: ${points} PTS`
@@ -208,20 +249,25 @@ app.post('/', handleApiPost);
 app.post('/api/index', handleApiPost);
 
 app.get('/', (req, res) => {
-  res.status(200).send('Telegram Bot Server is running successfully on Render!');
+  res.status(200).send('Telegram Bot Server is running!');
 });
 
 app.get('/api/index', (req, res) => {
-  res.status(200).send('Telegram Bot Server is running successfully on Render!');
+  res.status(200).send('Telegram Bot Server is running!');
 });
 
-app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
-  // Render မှာ bot.launch() နဲ့ polling လုပ်နိုင်သည် (အရင် Vercel webhook ရှိခဲ့ရင် dropPendingUpdates: true နဲ့ ချောမွေ့စေနိုင်သည်)
-  bot.launch({ dropPendingUpdates: true })
-    .then(() => console.log('Telegraf bot launched on Render'))
-    .catch((err) => console.error('Bot launch error:', err));
-});
+if (!process.env.VERCEL || process.env.ENABLE_POLLING === 'true') {
+  app.listen(PORT, () => {
+    console.log(`Server listening on port ${PORT}`);
+    if (bot) {
+      bot.launch({ dropPendingUpdates: true })
+        .then(() => console.log('Telegraf bot launched'))
+        .catch((err) => console.error('Bot launch error:', err));
+    }
+  });
 
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+  process.once('SIGINT', () => bot && bot.stop('SIGINT'));
+  process.once('SIGTERM', () => bot && bot.stop('SIGTERM'));
+}
+
+export default app;
