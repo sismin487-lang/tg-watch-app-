@@ -1,12 +1,10 @@
 import express from 'express';
 import { Telegraf } from 'telegraf';
-import { Redis } from '@upstash/redis';
 import crypto from 'crypto';
 
 const app = express();
 app.use(express.json());
 
-// CORS header
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
@@ -20,15 +18,22 @@ const PORT = process.env.PORT || 3000;
 const DAILY_AD_LIMIT = 20;
 const AD_REWARD_POINTS = 15;
 
-if (!token) {
-  console.error('Missing TELEGRAM_BOT_TOKEN (or BOT_TOKEN)');
-}
-
 const bot = token ? new Telegraf(token) : null;
 
-const redisUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-const redisToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
-const redis = redisUrl && redisToken ? new Redis({ url: redisUrl, token: redisToken }) : null;
+const redisUrl = (process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || '').replace(/\/$/, '');
+const redisToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || '';
+
+async function redisCmd(command, ...args) {
+  if (!redisUrl || !redisToken) {
+    throw new Error('Redis configuration missing');
+  }
+  const res = await fetch(`${redisUrl}/${command}/${args.map(a => encodeURIComponent(String(a))).join('/')}`, {
+    headers: { Authorization: `Bearer ${redisToken}` },
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data.result;
+}
 
 const START_TEXT = `TG Watch - App ဖွင့်ရန် အောက်က Button ကိုနှိပ်ပါ`;
 
@@ -36,18 +41,14 @@ if (bot) {
   bot.start(async (ctx) => {
     try {
       const chatId = ctx.chat.id;
-      if (redis) {
-        await redis.sadd('tg_watch:users', String(chatId));
+      if (redisUrl && redisToken) {
+        await redisCmd('sadd', 'tg_watch:users', String(chatId));
       }
-
       const webappUrl = process.env.WEBAPP_URL || 'https://tg-watch-app.vercel.app';
       const keyboard = [[{ text: 'App ဖွင့်မယ်', web_app: { url: webappUrl } }]];
       await ctx.reply(START_TEXT, { reply_markup: { inline_keyboard: keyboard } });
     } catch (e) {
-      console.error('bot.start error:', e);
-      try {
-        await ctx.reply(START_TEXT);
-      } catch (e2) {}
+      try { await ctx.reply(START_TEXT); } catch (e2) {}
     }
   });
 
@@ -80,20 +81,15 @@ function getTodayDateStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
-// Mini App / API POST handler
 async function handleApiPost(req, res) {
   try {
-    if (!redis) {
+    if (!redisUrl || !redisToken) {
       return res.status(500).json({ success: false, error: 'Redis configuration missing' });
     }
 
     let body = req.body || {};
     if (typeof body === 'string') {
-      try {
-        body = JSON.parse(body);
-      } catch {
-        body = {};
-      }
+      try { body = JSON.parse(body); } catch { body = {}; }
     }
 
     const { action, userId, startPayload, initData, walletAddress } = body;
@@ -113,29 +109,25 @@ async function handleApiPost(req, res) {
     }
 
     if (action === 'login' || action === 'get_points') {
-      let points = await redis.get(userKey);
+      let points = await redisCmd('get', userKey);
       if (points === null) {
         points = 0;
-        await redis.set(userKey, points);
+        await redisCmd('set', userKey, 0);
       }
       if (action === 'login' && startPayload) {
         const referrerId = startPayload.toString().replace('ref_', '').trim();
-        const isRefChecked = await redis.get(refCheckedKey);
+        const isRefChecked = await redisCmd('get', refCheckedKey);
         if (referrerId && referrerId !== stringUserId && !isRefChecked) {
-          await redis.set(refCheckedKey, 'true');
+          await redisCmd('set', refCheckedKey, 'true');
           const referrerKey = `user:${referrerId}:points`;
-          let referrerPoints = await redis.get(referrerKey);
-          if (referrerPoints === null) {
-            referrerPoints = 100;
-          } else {
-            referrerPoints = parseInt(referrerPoints, 10) + 100;
-          }
-          await redis.set(referrerKey, referrerPoints);
+          let referrerPoints = await redisCmd('get', referrerKey);
+          referrerPoints = referrerPoints === null ? 100 : parseInt(referrerPoints, 10) + 100;
+          await redisCmd('set', referrerKey, referrerPoints);
         }
       }
-      const finalPoints = await redis.get(userKey);
-      const pending = await redis.get(`user:${stringUserId}:pending_withdraw`);
-      const todayAds = parseInt(await redis.get(`user:${stringUserId}:ads:${getTodayDateStr()}`), 10) || 0;
+      const finalPoints = await redisCmd('get', userKey);
+      const pending = await redisCmd('get', `user:${stringUserId}:pending_withdraw`);
+      const todayAds = parseInt(await redisCmd('get', `user:${stringUserId}:ads:${getTodayDateStr()}`), 10) || 0;
       return res.status(200).json({
         success: true,
         points: parseInt(finalPoints || 0, 10),
@@ -148,10 +140,10 @@ async function handleApiPost(req, res) {
     if (action === 'watched_ad') {
       const today = getTodayDateStr();
       const dailyAdKey = `user:${stringUserId}:ads:${today}`;
-      const currentAds = parseInt(await redis.get(dailyAdKey), 10) || 0;
+      const currentAds = parseInt(await redisCmd('get', dailyAdKey), 10) || 0;
 
       if (currentAds >= DAILY_AD_LIMIT) {
-        const cur = await redis.get(userKey);
+        const cur = await redisCmd('get', userKey);
         return res.status(200).json({
           success: true,
           points: parseInt(cur || 0, 10),
@@ -162,10 +154,10 @@ async function handleApiPost(req, res) {
       }
 
       const lastAdKey = `user:${stringUserId}:last_ad`;
-      const lastAd = await redis.get(lastAdKey);
+      const lastAd = await redisCmd('get', lastAdKey);
       const now = Date.now();
       if (lastAd && now - parseInt(lastAd, 10) < 10000) {
-        const cur = await redis.get(userKey);
+        const cur = await redisCmd('get', userKey);
         return res.status(200).json({
           success: true,
           points: parseInt(cur || 0, 10),
@@ -174,14 +166,13 @@ async function handleApiPost(req, res) {
         });
       }
 
-      await redis.set(lastAdKey, now);
-      const nextAds = await redis.incr(dailyAdKey);
-      await redis.expire(dailyAdKey, 86400);
+      await redisCmd('set', lastAdKey, now);
+      const nextAds = await redisCmd('incr', dailyAdKey);
+      await redisCmd('expire', dailyAdKey, 86400);
 
-      let points = await redis.get(userKey);
-      if (points === null) points = 0;
-      points = parseInt(points, 10) + AD_REWARD_POINTS;
-      await redis.set(userKey, points);
+      let points = await redisCmd('get', userKey);
+      points = (points === null ? 0 : parseInt(points, 10)) + AD_REWARD_POINTS;
+      await redisCmd('set', userKey, points);
 
       return res.status(200).json({
         success: true,
@@ -195,20 +186,19 @@ async function handleApiPost(req, res) {
     if (action === 'vpn_bonus') {
       const today = getTodayDateStr();
       const vpnKey = `user:${stringUserId}:vpn_bonus:${today}`;
-      const count = parseInt(await redis.get(vpnKey)) || 0;
+      const count = parseInt(await redisCmd('get', vpnKey), 10) || 0;
       if (count >= 10) {
-        const cur = await redis.get(userKey);
+        const cur = await redisCmd('get', userKey);
         return res.status(200).json({ success: true, points: parseInt(cur || 0, 10), limitReached: true });
       }
-      await redis.incr(vpnKey);
-      await redis.expire(vpnKey, 86400);
-      const points = await redis.incrby(userKey, 5);
+      await redisCmd('incr', vpnKey);
+      await redisCmd('expire', vpnKey, 86400);
+      const points = await redisCmd('incrby', userKey, 5);
       return res.status(200).json({ success: true, points: parseInt(points, 10), limitReached: false });
     }
 
     if (action === 'request_withdraw') {
-      let points = await redis.get(userKey);
-      points = parseInt(points || 0, 10);
+      let points = parseInt(await redisCmd('get', userKey) || 0, 10);
       if (points < 1500) {
         return res.status(200).json({ success: false, error: 'Points မလုံလောက်ပါ' });
       }
@@ -219,10 +209,11 @@ async function handleApiPost(req, res) {
       if (!['TON', 'KPay', 'WavePay'].includes(payMethod)) {
         return res.status(200).json({ success: false, error: 'Payment Method မမှန်ပါ' });
       }
-      await redis.set(userKey, 0);
-      await redis.set(`user:${stringUserId}:pending_withdraw`, points);
+      await redisCmd('set', userKey, 0);
+      await redisCmd('set', `user:${stringUserId}:pending_withdraw`, points);
       const withdrawId = `${Date.now()}_${stringUserId}`;
-      await redis.set(
+      await redisCmd(
+        'set',
         `withdraw:${withdrawId}`,
         JSON.stringify({
           userId: stringUserId,
@@ -251,7 +242,6 @@ async function handleApiPost(req, res) {
   }
 }
 
-// Unified POST handler: Telegram Webhook updates vs Mini App API calls
 async function handlePost(req, res) {
   const body = req.body || {};
   const isTelegramUpdate =
@@ -264,45 +254,27 @@ async function handlePost(req, res) {
     }
     try {
       await bot.handleUpdate(body, res);
-      if (!res.headersSent) {
-        res.status(200).json({ ok: true });
-      }
+      if (!res.headersSent) res.status(200).json({ ok: true });
       return;
     } catch (err) {
-      console.error('Telegram webhook error:', err);
-      if (!res.headersSent) {
-        return res.status(500).json({ ok: false, error: err.message });
-      }
+      if (!res.headersSent) return res.status(500).json({ ok: false, error: err.message });
       return;
     }
   }
-
   return handleApiPost(req, res);
 }
 
 app.post('/', handlePost);
 app.post('/api/index', handlePost);
 
-app.get('/', (req, res) => {
-  res.status(200).send('Telegram Bot Server is running!');
-});
-
-app.get('/api/index', (req, res) => {
-  res.status(200).send('Telegram Bot Server is running!');
-});
+app.get('/', (req, res) => res.status(200).send('Telegram Bot Server is running!'));
+app.get('/api/index', (req, res) => res.status(200).send('Telegram Bot Server is running!'));
 
 if (!process.env.VERCEL || process.env.ENABLE_POLLING === 'true') {
   app.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
-    if (bot) {
-      bot.launch({ dropPendingUpdates: true })
-        .then(() => console.log('Telegraf bot launched'))
-        .catch((err) => console.error('Bot launch error:', err));
-    }
+    if (bot) bot.launch({ dropPendingUpdates: true }).catch(() => {});
   });
-
-  process.once('SIGINT', () => bot && bot.stop('SIGINT'));
-  process.once('SIGTERM', () => bot && bot.stop('SIGTERM'));
 }
 
 export default app;
