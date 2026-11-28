@@ -1,16 +1,3 @@
-let redisClient;
-
-async function getRedis() {
-  if (!redisClient) {
-    const { Redis } = await import('@upstash/redis');
-    redisClient = new Redis({
-      url: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL,
-      token: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
-    });
-  }
-  return redisClient;
-}
-
 const DAILY_AD_LIMIT = 20;
 const AD_REWARD_POINTS = 15;
 
@@ -18,12 +5,34 @@ function getTodayDateStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function getRedisConfig() {
+  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) {
+    throw new Error("Missing Upstash Redis URL or Token in environment variables");
+  }
+  return { url: url.replace(/\/+$/, ""), token };
+}
+
+async function redisCmd(...args) {
+  const { url, token } = getRedisConfig();
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(args),
+  });
+  const data = await res.json();
+  if (!res.ok || data.error) {
+    throw new Error(data.error || `Redis HTTP error ${res.status}`);
+  }
+  return data.result;
+}
+
 export default async (req, res) => {
   try {
-    const redis = await getRedis();
-
-    // Adsgram sends ?userid=123
-    // Sometimes it can be userid / userId / user_id, so catch all 3 types
     const userid = req.query.userid || req.query.userId || req.query.user_id;
 
     if (!userid) {
@@ -36,9 +45,9 @@ export default async (req, res) => {
     const today = getTodayDateStr();
     const dailyAdKey = `user:${stringUserId}:ads:${today}`;
 
-    const currentAds = parseInt(await redis.get(dailyAdKey), 10) || 0;
+    const currentAds = parseInt(await redisCmd("GET", dailyAdKey), 10) || 0;
     if (currentAds >= DAILY_AD_LIMIT) {
-      const cur = await redis.get(userKey);
+      const cur = await redisCmd("GET", userKey);
       return res.status(200).json({
         success: true,
         points: parseInt(cur || 0, 10),
@@ -48,11 +57,10 @@ export default async (req, res) => {
       });
     }
 
-    // If called again within 10 seconds, do not add again (same as in index.js)
-    const lastAd = await redis.get(lastAdKey);
+    const lastAd = await redisCmd("GET", lastAdKey);
     const now = Date.now();
     if (lastAd && (now - parseInt(lastAd, 10)) < 10000) {
-      const cur = await redis.get(userKey);
+      const cur = await redisCmd("GET", userKey);
       return res.status(200).json({
         success: true,
         points: parseInt(cur || 0, 10),
@@ -61,12 +69,11 @@ export default async (req, res) => {
       });
     }
 
-    await redis.set(lastAdKey, now);
-    const nextAds = await redis.incr(dailyAdKey);
-    await redis.expire(dailyAdKey, 86400);
+    await redisCmd("SET", lastAdKey, now);
+    const nextAds = await redisCmd("INCR", dailyAdKey);
+    await redisCmd("EXPIRE", dailyAdKey, 86400);
 
-    // Add +15 Points - same as watched_ad
-    const points = await redis.incrby(userKey, AD_REWARD_POINTS);
+    const points = await redisCmd("INCRBY", userKey, AD_REWARD_POINTS);
 
     console.log(`Reward +${AD_REWARD_POINTS} for user ${stringUserId}, total: ${points}, ads today: ${nextAds}/${DAILY_AD_LIMIT}`);
 
