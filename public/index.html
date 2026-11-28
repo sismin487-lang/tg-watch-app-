@@ -19,9 +19,6 @@
     .money-box{background:#020617;border:1px solid #1e293b;border-radius:14px;padding:8px 4px;text-align:center}
     .money-box .m-label{font-size:10px;color:#94a3b8;font-weight:600}
     .money-box .m-val{font-size:13px;font-weight:800;margin-top:2px}
-    /* Full-Screen Fallback Ad Modal */
-    #fallback-ad-modal{display:none;position:fixed;inset:0;z-index:9999;background:#020617;flex-direction:column;justify-content:space-between;padding:20px}
-    #fallback-ad-modal.show{display:flex}
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-between p-4 selection:bg-sky-500 selection:text-white">
@@ -147,30 +144,6 @@
     </div>
   </div>
 
-  <!-- Full-Screen Fallback Ad Modal (10s Countdown) -->
-  <div id="fallback-ad-modal">
-    <div class="flex items-center justify-between text-xs text-slate-300 bg-slate-900/90 border border-slate-800 rounded-2xl px-4 py-3">
-      <span class="font-bold text-sky-400"><i class="fa-solid fa-bullhorn mr-1"></i> Sponsored Ad</span>
-      <span id="fallback-timer-text" class="font-mono font-bold text-amber-400">10s</span>
-    </div>
-
-    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center my-auto flex flex-col items-center gap-3 shadow-2xl">
-      <div class="w-16 h-16 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 text-3xl">
-        <i class="fa-solid fa-play"></i>
-      </div>
-      <h3 class="text-lg font-black text-white">Tg Watch Partner Promo</h3>
-      <p class="text-xs text-slate-400 leading-relaxed">ကြော်ငြာကို ၁၀ စက္ကန့်ပြည့်အောင် စောင့်ပြီး <span class="text-sky-400 font-bold">+15 PTS</span> ရယူပါ။</p>
-      <a href="https://t.me/silent487" target="_blank" rel="noopener noreferrer" class="mt-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl inline-flex items-center gap-1.5">
-        <i class="fa-brands fa-telegram"></i>
-        <span>Open Channel</span>
-      </a>
-    </div>
-
-    <button id="fallback-claim-btn" onclick="claimFallbackReward()" disabled class="w-full py-3.5 px-4 bg-slate-800 text-slate-500 font-bold rounded-2xl cursor-not-allowed transition-all duration-200">
-      ခဏစောင့်ပါ (10s)...
-    </button>
-  </div>
-
   <div class="text-center text-[10px] text-slate-600 mt-4 font-mono">
     Tg Watch Mini App v1.0  Powered by Adsgram & TON
   </div>
@@ -189,14 +162,11 @@
     const USD_TO_MMK = 4678;
     const MIN_WITHDRAWAL = 1500;
     const DAILY_AD_LIMIT = 20;
-    const FALLBACK_AD_SECONDS = 10;
     let telegramUserId = null;
     let userPoints = 0;
+    let todayAdsCount = 0;
     let payMethod = "TON";
     const botUsername = "Adsgram12_bot";
-
-    let fallbackTimer = null;
-    let fallbackDone = false;
 
     function getTodayDateStr() {
       const now = new Date();
@@ -212,14 +182,14 @@
     }
 
     function getTodayAdCount() {
+      if (todayAdsCount > 0) return todayAdsCount;
       const val = parseInt(localStorage.getItem(getDailyAdStorageKey()) || '0', 10);
       return Number.isNaN(val) ? 0 : val;
     }
 
-    function incrementTodayAdCount() {
-      const next = getTodayAdCount() + 1;
-      localStorage.setItem(getDailyAdStorageKey(), String(next));
-      return next;
+    function setTodayAdCount(n) {
+      todayAdsCount = parseInt(n || 0, 10);
+      localStorage.setItem(getDailyAdStorageKey(), String(todayAdsCount));
     }
 
     function updateAdButtonState() {
@@ -269,45 +239,13 @@
         const refLink = `https://t.me/${botUsername}/app?startapp=ref_${telegramUserId}`;
         document.getElementById('ref-link-input').value = refLink;
 
-        const lastActiveUser = localStorage.getItem('last_telegram_user_id');
-        if (lastActiveUser && lastActiveUser !== telegramUserId.toString()) {
-            if (tonConnectUI && tonConnectUI.connected) {
-                try { tonConnectUI.disconnect().catch(()=>{}); } catch(e){}
-            }
-            const keysToRemove = [];
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && (key.includes('ton-connect') || key.includes('tc-') || key.includes('tonconnect'))) {
-                    keysToRemove.push(key);
-                }
-            }
-            keysToRemove.forEach(k => localStorage.removeItem(k));
-        }
-        localStorage.setItem('last_telegram_user_id', telegramUserId.toString());
-
         const savedPoints = localStorage.getItem(`tg_watch_points_${telegramUserId}`);
         if (savedPoints !== null) {
             userPoints = parseInt(savedPoints, 10);
             updateUI();
         }
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const startPayload = tg.initDataUnsafe?.start_param || urlParams.get('startapp') || urlParams.get('start') || "";
-
-        fetch('/api/index', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'login', userId: telegramUserId, startPayload: startPayload })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success && typeof data.points === 'number') {
-                userPoints = Math.max(userPoints, data.points);
-                saveUserPoints();
-                updateUI();
-            }
-        })
-        .catch(err => console.log("API sync fallback to local storage"));
+        setTodayAdCount(localStorage.getItem(getDailyAdStorageKey()) || '0');
+        updateUI();
     } else {
         document.getElementById('user-greeting').innerHTML = `<i class="fa-solid fa-globe text-amber-400"></i> Web Browser Preview Mode`;
         document.getElementById('ref-link-input').value = `https://t.me/${botUsername}/app?startapp=ref_52504489`;
@@ -407,39 +345,9 @@
     try {
         if (typeof window.Adsgram !== 'undefined' && window.Adsgram && window.Adsgram.init) {
             adController = window.Adsgram.init({ blockId: "58231", debug: false });
-        } else { throw new Error("Adsgram not loaded"); }
+        }
     } catch (e) {
-        console.log("Adsgram load failed", e);
-    }
-
-    function openFallbackModal() {
-        const modal = document.getElementById('fallback-ad-modal');
-        const timerText = document.getElementById('fallback-timer-text');
-        const claimBtn = document.getElementById('fallback-claim-btn');
-        let remaining = FALLBACK_AD_SECONDS;
-        fallbackDone = false;
-
-        claimBtn.disabled = true;
-        claimBtn.className = "w-full py-3.5 px-4 bg-slate-800 text-slate-500 font-bold rounded-2xl cursor-not-allowed transition-all duration-200";
-        claimBtn.innerText = `ခဏစောင့်ပါ (${remaining}s)...`;
-        timerText.innerText = `${remaining}s`;
-        modal.classList.add('show');
-
-        clearInterval(fallbackTimer);
-        fallbackTimer = setInterval(() => {
-            remaining -= 1;
-            if (remaining > 0) {
-                timerText.innerText = `${remaining}s`;
-                claimBtn.innerText = `ခဏစောင့်ပါ (${remaining}s)...`;
-            } else {
-                clearInterval(fallbackTimer);
-                fallbackDone = true;
-                timerText.innerText = "0s";
-                claimBtn.disabled = false;
-                claimBtn.className = "w-full py-3.5 px-4 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-bold rounded-2xl cursor-pointer transition-all duration-200";
-                claimBtn.innerText = "ဆုလက်ဆောင်ယူမည် (+15 PTS)";
-            }
-        }, 1000);
+        console.log("Adsgram init error", e);
     }
 
     function resetAdButton() {
@@ -448,44 +356,25 @@
         updateAdButtonState();
     }
 
-    async function grantAdReward() {
-        incrementTodayAdCount();
-        if (telegramUserId) {
-            try {
-                const res = await fetch('/api/index', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'watched_ad', userId: telegramUserId })
-                });
-                const data = await res.json();
-                if (data.success && typeof data.points === 'number') {
-                    userPoints = data.points;
-                    saveUserPoints();
-                    updateUI();
-                } else {
-                    userPoints += 15;
-                    saveUserPoints();
-                    updateUI();
-                }
-            } catch (e) {
-                userPoints += 15;
-                saveUserPoints();
-                updateUI();
-            }
-        } else {
-            userPoints += 15;
-            saveUserPoints();
-            updateUI();
+    async function grantAdRewardFromServer() {
+        if (!telegramUserId) {
+            tg.showAlert("Telegram User ID မတွေ့ပါ။ Telegram Mini App ထဲကနေ ဖွင့်ပါ။");
+            return;
         }
-        resetAdButton();
+        const res = await fetch(`/api/reward?userid=${encodeURIComponent(telegramUserId)}`);
+        const data = await res.json();
+        if (!data || !data.success) {
+            throw new Error((data && data.error) || "Reward API failed");
+        }
+        if (typeof data.points === "number") {
+            userPoints = data.points;
+            saveUserPoints();
+        }
+        if (typeof data.todayAds === "number") {
+            setTodayAdCount(data.todayAds);
+        }
+        updateUI();
         tg.showAlert("ဂုဏ်ယူပါတယ်! ကြော်ငြာကြည့်ရှုပြီး 15 PTS ရရှိသွားပါပြီ။");
-    }
-
-    async function claimFallbackReward() {
-        if (!fallbackDone) return;
-        clearInterval(fallbackTimer);
-        document.getElementById('fallback-ad-modal').classList.remove('show');
-        await grantAdReward();
     }
 
     async function showAdsgramAd() {
@@ -500,26 +389,21 @@
         btn.disabled = true;
         btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ကြော်ငြာဖွင့်နေသည်...`;
 
-        let adSuccess = false;
-        if (adController) {
-            let attempts = 0;
-            const maxAttempts = 2;
-            while (attempts < maxAttempts && !adSuccess) {
-                attempts++;
-                try {
-                    const adParams = telegramUserId ? { userId: telegramUserId.toString() } : {};
-                    const result = await adController.show(adParams);
-                    if (result && result.done) { adSuccess = true; }
-                } catch (err) {
-                    if (attempts < maxAttempts) { await new Promise(resolve => setTimeout(resolve, 1000)); }
-                }
+        try {
+            if (!adController || typeof adController.show !== "function") {
+                throw new Error("Adsgram SDK မပွင့်ပါ (Block ID သို့မဟုတ် Ad inventory စစ်ပါ)");
             }
-        }
-
-        if (adSuccess) {
-            await grantAdReward();
-        } else {
-            openFallbackModal();
+            const adParams = telegramUserId ? { userId: telegramUserId.toString() } : {};
+            const result = await adController.show(adParams);
+            if (result && result.done) {
+                await grantAdRewardFromServer();
+            } else {
+                tg.showAlert("ကြော်ငြာကို ပြီးဆုံးအောင် မကြည့်ရသေးပါ။");
+            }
+        } catch (err) {
+            tg.showAlert("ကြော်ငြာပြလို့ မရသေးပါ: " + (err && err.message ? err.message : String(err)));
+        } finally {
+            resetAdButton();
         }
     }
 
