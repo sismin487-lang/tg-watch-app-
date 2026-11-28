@@ -1,9 +1,15 @@
-import { Redis } from '@upstash/redis';
+let redisClient;
 
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
-});
+async function getRedis() {
+  if (!redisClient) {
+    const { Redis } = await import('@upstash/redis');
+    redisClient = new Redis({
+      url: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
+    });
+  }
+  return redisClient;
+}
 
 const DAILY_AD_LIMIT = 20;
 const AD_REWARD_POINTS = 15;
@@ -14,6 +20,8 @@ function getTodayDateStr() {
 
 export default async (req, res) => {
   try {
+    const redis = await getRedis();
+
     // Adsgram sends ?userid=123
     // Sometimes it can be userid / userId / user_id, so catch all 3 types
     const userid = req.query.userid || req.query.userId || req.query.user_id;
